@@ -46,6 +46,9 @@ public class ApplicationDbContext : DbContext
     // Digital signatures
     public DbSet<Signature> Signatures { get; set; }
 
+    // Subscriptions
+    public DbSet<Subscription> Subscriptions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
