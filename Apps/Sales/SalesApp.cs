@@ -243,12 +243,18 @@ public class OpportunityEditSheet(IState<bool> isOpen, int id, RefreshToken refr
     public override object? Build()
     {
         var db = this.UseService<ApplicationDbContext>();
-        var opportunity = this.UseState(() => db.Opportunities.Find(id)!);
+        var opportunity = this.UseState(() => db.Opportunities.Find(id));
+
+        // Handle case where opportunity is not found
+        if (opportunity.Value == null)
+        {
+            return new Error("Opportunity not found.");
+        }
 
         this.UseEffect(() =>
         {
             var existingOpportunity = db.Opportunities.Find(id);
-            if (existingOpportunity != null)
+            if (existingOpportunity != null && opportunity.Value != null)
             {
                 existingOpportunity.Name = opportunity.Value.Name;
                 existingOpportunity.Description = opportunity.Value.Description;
