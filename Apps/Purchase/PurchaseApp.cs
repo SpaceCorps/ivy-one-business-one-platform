@@ -87,6 +87,7 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
         var currentStatus = this.UseState(order.Status);
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
+        var orderData = this.UseState(order);
         
         this.UseEffect(() =>
         {
@@ -111,7 +112,8 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
                 var updatedOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
                 if (updatedOrder != null)
                 {
-                    // Update local state with fresh data
+                    // Update all local state with fresh data
+                    orderData.Set(updatedOrder);
                     currentStatus.Set(updatedOrder.Status);
                 }
             }
@@ -125,27 +127,27 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
 
         var orderDetails = new
         {
-            OrderNumber = order.OrderNumber,
-            Supplier = order.Supplier,
-            Amount = $"${order.Amount:N2}",
+            OrderNumber = orderData.Value.OrderNumber,
+            Supplier = orderData.Value.Supplier,
+            Amount = $"${orderData.Value.Amount:N2}",
             Status = statusBadge,
-            OrderDate = order.OrderDate.ToString("MMM dd, yyyy"),
-            ExpectedDelivery = order.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "Not set",
-            PaymentTerms = order.PaymentTerms,
-            Department = order.Department,
-            Notes = order.Notes
+            OrderDate = orderData.Value.OrderDate.ToString("MMM dd, yyyy"),
+            ExpectedDelivery = orderData.Value.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "Not set",
+            PaymentTerms = orderData.Value.PaymentTerms,
+            Department = orderData.Value.Department,
+            Notes = orderData.Value.Notes
         };
         
         return Layout.Vertical()
             .Gap(4)
-            .Add(Text.H3($"Purchase Order {order.OrderNumber}"))
+            .Add(Text.H3($"Purchase Order {orderData.Value.OrderNumber}"))
             .Add(orderDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Notes))
             .Add(Layout.Horizontal()
                 .Gap(4)
                 .Add(currentStatus.Value == PurchaseOrderStatus.Pending 
                     ? new Button("Approve Order", _ => {
                         currentStatus.Set(PurchaseOrderStatus.Approved);
-                        client.Toast($"Purchase Order {order.OrderNumber} approved!");
+                        client.Toast($"Purchase Order {orderData.Value.OrderNumber} approved!");
                     })
                         .Variant(ButtonVariant.Success)
                         .Icon(Icons.Check)
@@ -153,7 +155,7 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
                 .Add(currentStatus.Value == PurchaseOrderStatus.Approved 
                     ? new Button("Mark as Received", _ => {
                         currentStatus.Set(PurchaseOrderStatus.Received);
-                        client.Toast($"Purchase Order {order.OrderNumber} marked as received!");
+                        client.Toast($"Purchase Order {orderData.Value.OrderNumber} marked as received!");
                     })
                         .Variant(ButtonVariant.Primary)
                         .Icon(Icons.Package)
@@ -173,7 +175,7 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
                             {
                                 context.PurchaseOrders.Remove(orderToDelete);
                                 context.SaveChanges();
-                                client.Toast($"Purchase Order {order.OrderNumber} deleted successfully!");
+                                client.Toast($"Purchase Order {orderData.Value.OrderNumber} deleted successfully!");
                                 refreshToken.Refresh();
                                 onRefresh?.Invoke();
                                 blades.Pop();
@@ -194,7 +196,7 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
                     onRefresh?.Invoke();
                 }),
                 title: "Edit Purchase Order",
-                description: $"Edit purchase order {order.OrderNumber}"
+                description: $"Edit purchase order {orderData.Value.OrderNumber}"
             ).Width(Size.Fraction(1/3f)) : null);
     }
 }
