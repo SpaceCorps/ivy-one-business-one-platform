@@ -5,7 +5,7 @@ public class DiscussApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new DiscussRootBlade(), "Discuss", Size.Units(80));
+        return this.UseBlades(() => new DiscussRootBlade(), "Discuss", Size.Units(100));
     }
 }
 

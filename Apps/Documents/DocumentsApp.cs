@@ -8,7 +8,7 @@ public class DocumentsApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new DocumentsRootBlade(), "Documents", Size.Units(80));
+        return this.UseBlades(() => new DocumentsRootBlade(), "Documents", Size.Units(100));
     }
 }
 

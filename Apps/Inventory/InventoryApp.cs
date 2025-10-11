@@ -8,7 +8,7 @@ public class InventoryApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new InventoryRootBlade(), "Inventory", Size.Units(80));
+        return this.UseBlades(() => new InventoryRootBlade(), "Inventory", Size.Units(100));
     }
 }
 

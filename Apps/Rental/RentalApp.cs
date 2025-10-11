@@ -5,7 +5,7 @@ public class RentalApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new RentalRootBlade(), "Rental Management", Size.Units(80));
+        return this.UseBlades(() => new RentalRootBlade(), "Rental Management", Size.Units(100));
     }
 }
 

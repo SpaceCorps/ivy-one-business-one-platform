@@ -5,7 +5,7 @@ public class HelpdeskApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new HelpdeskRootBlade(), "Helpdesk", Size.Units(80));
+        return this.UseBlades(() => new HelpdeskRootBlade(), "Helpdesk", Size.Units(100));
     }
 }
 
