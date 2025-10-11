@@ -245,12 +245,24 @@ public class OpportunityEditSheet(IState<bool> isOpen, int id, RefreshToken refr
         var db = this.UseService<ApplicationDbContext>();
         var opportunity = this.UseState(() => db.Opportunities.Find(id)!);
 
-        this.UseEffect(async () =>
+        this.UseEffect(() =>
         {
-            opportunity.Value.UpdatedAt = DateTime.UtcNow;
-            db.Opportunities.Update(opportunity.Value);
-            await db.SaveChangesAsync();
-            refreshToken.Refresh();
+            var existingOpportunity = db.Opportunities.Find(id);
+            if (existingOpportunity != null)
+            {
+                existingOpportunity.Name = opportunity.Value.Name;
+                existingOpportunity.Description = opportunity.Value.Description;
+                existingOpportunity.Amount = opportunity.Value.Amount;
+                existingOpportunity.Stage = opportunity.Value.Stage;
+                existingOpportunity.Probability = opportunity.Value.Probability;
+                existingOpportunity.ExpectedCloseDate = opportunity.Value.ExpectedCloseDate;
+                existingOpportunity.ContactId = opportunity.Value.ContactId;
+                existingOpportunity.Notes = opportunity.Value.Notes;
+                existingOpportunity.UpdatedAt = DateTime.UtcNow;
+                
+                db.SaveChanges();
+                refreshToken.Refresh();
+            }
         }, [opportunity]);
 
         return opportunity
