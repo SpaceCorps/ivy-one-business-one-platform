@@ -8,210 +8,159 @@ public class KnowledgeApp : ViewBase
 {
     public override object? Build()
     {
+        return this.UseBlades(() => new KnowledgeRootBlade(), "Knowledge Base");
+    }
+}
+
+public class KnowledgeRootBlade : ViewBase
+{
+    public override object? Build()
+    {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        
-        var selectedView = this.UseState("articles");
+        var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(24)
-                .Add("Knowledge Base")
-                .Add("Access and manage your knowledge articles and FAQs")
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("Articles", _ => selectedView.Set("articles"))
-                        .Variant(selectedView.Value == "articles" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Categories", _ => selectedView.Set("categories"))
-                        .Variant(selectedView.Value == "categories" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Create Article", _ => selectedView.Set("create"))
-                        .Variant(selectedView.Value == "create" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                )
-                .Add(selectedView.Value == "create" 
-                    ? BuildCreateArticleView(context, client)
-                    : Layout.Vertical()
-                        .Gap(12)
-                        .Add(BuildSearchBar(searchQuery, client))
-                        .Add(BuildSelectedView(selectedView.Value, context, client, searchQuery.Value)))
-        );
-    }
-
-    private object BuildSearchBar(IState<string> searchQuery, IClientProvider client)
-    {
-        return Layout.Horizontal()
-            .Gap(12)
-            .Add(new TextInput(searchQuery)
-                .Placeholder("Search articles...")
-                .Variant(TextInputs.Search))
-            .Add(new Button("Clear", _ => searchQuery.Set(""))
-                .Variant(ButtonVariant.Outline)
-                .Small());
-    }
-
-    private object BuildSelectedView(string view, ApplicationDbContext context, IClientProvider client, string searchQuery)
-    {
-        return view switch
-        {
-            "articles" => BuildArticlesView(context, client, searchQuery),
-            "categories" => BuildCategoriesView(context, client),
-            _ => "Select a view"
-        };
-    }
-
-    private object BuildArticlesView(ApplicationDbContext context, IClientProvider client, string searchQuery)
-    {
         var query = context.Articles
             .Include(a => a.Category)
             .Where(a => a.Status == "Published");
 
-        if (!string.IsNullOrEmpty(searchQuery))
+        if (!string.IsNullOrEmpty(searchQuery.Value))
         {
-            query = query.Where(a => a.Title.Contains(searchQuery) || 
-                                   a.Content.Contains(searchQuery) || 
-                                   a.Summary.Contains(searchQuery));
+            query = query.Where(a => a.Title.Contains(searchQuery.Value) || 
+                                   a.Content.Contains(searchQuery.Value) || 
+                                   a.Summary.Contains(searchQuery.Value));
         }
 
         var articles = query.OrderByDescending(a => a.CreatedAt).ToList();
+        var categories = context.Categories.Include(c => c.Articles).Where(c => c.IsActive).ToList();
+        
+        var listItems = articles.Select(article => new ListItem(
+            title: article.Title,
+            subtitle: $"{article.Category?.Name ?? "Uncategorized"} - {article.ViewCount} views - By {article.Author}",
+            icon: Icons.FileText,
+            badge: article.Category?.Name ?? "Uncategorized",
+            onClick: _ => blades.Push(this, new ArticleDetailBlade(article.Id), article.Title)
+        ));
+        
+        return BladeHelper.WithHeader(
+            Layout.Vertical()
+                .Gap(12)
+                .Add(searchQuery.ToSearchInput().Placeholder("Search articles..."))
+                .Add(Layout.Horizontal()
+                    .Gap(12)
+                    .Add(new Button("New Article", _ => client.Toast("Create article"))
+                        .Icon(Icons.Plus)
+                        .Variant(ButtonVariant.Primary))
+                    .Add(new Button("Categories", _ => blades.Push(this, new CategoriesBlade(), "Categories"))
+                        .Variant(ButtonVariant.Secondary))),
+            articles.Count == 0 
+                ? "No articles found. Create your first article!"
+                : new List(listItems)
+        );
+    }
+}
+
+public class ArticleDetailBlade(int articleId) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var article = context.Articles.Include(a => a.Category).FirstOrDefault(a => a.Id == articleId);
+        
+        if (article == null)
+            return "Article not found";
         
         return new Card(
             Layout.Vertical()
                 .Gap(16)
                 .Padding(16)
+                .Add(article.Title)
+                .Add(Layout.Horizontal()
+                    .Gap(8)
+                    .Add(new Badge(article.Category?.Name ?? "Uncategorized").Variant(BadgeVariant.Secondary))
+                    .Add(new Badge($"{article.ViewCount} views").Variant(BadgeVariant.Outline))
+                    .Add(new Badge(article.Author).Variant(BadgeVariant.Info))
+                    .Add(new Badge(article.Status).Variant(BadgeVariant.Success)))
+                .Add("Summary")
+                .Add(article.Summary)
+                .Add("Content")
+                .Add(article.Content)
+                .Add($"Created: {article.CreatedAt:MMM dd, yyyy}")
                 .Add(Layout.Horizontal()
                     .Gap(12)
-                    .Add($"Articles ({articles.Count})")
-                    .Add(new Button("New Article", _ => client.Toast("Create new article coming soon!"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary)))
-                .Add(articles.Count == 0 
-                    ? "No articles found. Create your first article!"
-                    : BuildArticlesList(articles, client))
+                    .Add(new Button("Edit", _ => client.Toast("Edit article"))
+                        .Variant(ButtonVariant.Primary))
+                    .Add(new Button("Share", _ => client.Toast("Share article"))
+                        .Variant(ButtonVariant.Secondary)))
         );
     }
+}
 
-    private object BuildCategoriesView(ApplicationDbContext context, IClientProvider client)
+public class CategoriesBlade : ViewBase
+{
+    public override object? Build()
     {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
         var categories = context.Categories
             .Include(c => c.Articles)
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
             .ToList();
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add("Categories")
-                    .Add(new Button("New Category", _ => client.Toast("Create new category coming soon!"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary)))
-                .Add(categories.Count == 0 
-                    ? "No categories found. Create your first category!"
-                    : BuildCategoriesList(categories, client))
-        );
-    }
-
-    private object BuildCreateArticleView(ApplicationDbContext context, IClientProvider client)
-    {
-        var categories = context.Categories.Where(c => c.IsActive).ToList();
-        
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add("Create New Article")
-                .Add(Layout.Vertical()
-                    .Gap(12)
-                    .Add(new TextInput(UseState(""))
-                        .Placeholder("Enter article title..."))
-                    .Add(new SelectInput<string>(UseState(""), categories.Select(c => c.Name).ToOptions())
-                        .Placeholder("Select a category"))
-                    .Add(new TextInput(UseState(""))
-                        .Placeholder("Enter article summary...")
-                        .Variant(TextInputs.Textarea))
-                    .Add(new TextInput(UseState(""))
-                        .Placeholder("Enter article content...")
-                        .Variant(TextInputs.Textarea))
-                    .Add(Layout.Horizontal()
-                        .Gap(12)
-                        .Add(new Button("Save Draft", _ => client.Toast("Article saved as draft!"))
-                            .Variant(ButtonVariant.Secondary))
-                        .Add(new Button("Publish", _ => client.Toast("Article published!"))
-                            .Variant(ButtonVariant.Primary))
-                        .Add(new Button("Cancel", _ => client.Toast("Creation cancelled!"))
-                            .Variant(ButtonVariant.Outline))))
-        );
-    }
-
-    private object BuildArticlesList(List<Data.Article> articles, IClientProvider client)
-    {
-        var articleCards = articles.Select(article => new Card(
-            Layout.Vertical()
-                .Gap(8)
-                .Padding(16)
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(Layout.Vertical()
-                        .Gap(4)
-                        .Add(article.Title)
-                        .Add(article.Summary)
-                        .Add(Layout.Horizontal()
-                            .Gap(8)
-                            .Add(new Badge(article.Category?.Name ?? "Uncategorized")
-                                .Variant(BadgeVariant.Secondary))
-                            .Add(new Badge($"Views: {article.ViewCount}")
-                                .Variant(BadgeVariant.Outline))
-                            .Add(new Badge(article.Author)
-                                .Variant(BadgeVariant.Info))))
-                    .Add(Layout.Vertical()
-                        .Gap(4)
-                        .Add(article.CreatedAt.ToString("MMM dd, yyyy"))
-                        .Add(Layout.Horizontal()
-                            .Gap(4)
-                            .Add(new Button("View", _ => client.Toast($"Viewing article: {article.Title}"))
-                                .Small()
-                                .Variant(ButtonVariant.Primary))
-                            .Add(new Button("Edit", _ => client.Toast($"Editing article: {article.Title}"))
-                                .Small()
-                                .Variant(ButtonVariant.Outline)))))
+        var listItems = categories.Select(category => new ListItem(
+            title: category.Name,
+            subtitle: $"{category.Description} - {category.Articles.Count} articles",
+            icon: Icons.Folder,
+            badge: $"{category.Articles.Count}",
+            onClick: _ => blades.Push(this, new CategoryDetailBlade(category.Id), category.Name)
         ));
-
-        return Layout.Vertical().Gap(8).Add(articleCards);
+        
+        return BladeHelper.WithHeader(
+            new Button("New Category", _ => client.Toast("Create category"))
+                .Icon(Icons.Plus)
+                .Variant(ButtonVariant.Primary),
+            categories.Count == 0 
+                ? "No categories found. Create your first category!"
+                : new List(listItems)
+        );
     }
+}
 
-    private object BuildCategoriesList(List<Data.Category> categories, IClientProvider client)
+public class CategoryDetailBlade(int categoryId) : ViewBase
+{
+    public override object? Build()
     {
-        var categoryCards = categories.Select(category => new Card(
-            Layout.Horizontal()
-                .Gap(12)
-                .Padding(16)
-                .Add(Layout.Vertical()
-                    .Gap(4)
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var category = context.Categories.Include(c => c.Articles).FirstOrDefault(c => c.Id == categoryId);
+        
+        if (category == null)
+            return "Category not found";
+        
+        var articleItems = category.Articles.Select(article => new ListItem(
+            title: article.Title,
+            subtitle: $"{article.ViewCount} views",
+            icon: Icons.FileText
+        ));
+        
+        return Layout.Vertical()
+            .Gap(16)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(12)
+                    .Padding(16)
                     .Add(category.Name)
                     .Add(category.Description)
-                    .Add(Layout.Horizontal()
-                        .Gap(8)
-                        .Add(new Badge($"{category.Articles.Count} articles")
-                            .Variant(BadgeVariant.Secondary))
-                        .Add(new Badge(category.IsActive ? "Active" : "Inactive")
-                            .Variant(category.IsActive ? BadgeVariant.Success : BadgeVariant.Secondary))))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(category.CreatedAt.ToString("MMM dd, yyyy"))
-                    .Add(Layout.Horizontal()
-                        .Gap(4)
-                        .Add(new Button("View Articles", _ => client.Toast($"Viewing articles in: {category.Name}"))
-                            .Small()
-                            .Variant(ButtonVariant.Primary))
-                        .Add(new Button("Edit", _ => client.Toast($"Editing category: {category.Name}"))
-                            .Small()
-                            .Variant(ButtonVariant.Outline))))
-        ));
-
-        return Layout.Vertical().Gap(8).Add(categoryCards);
+                    .Add(new Badge($"{category.Articles.Count} articles").Variant(BadgeVariant.Info))))
+            .Add(category.Articles.Any() 
+                ? new List(articleItems)
+                : "No articles in this category yet.");
     }
 }
