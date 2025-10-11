@@ -14,7 +14,11 @@ public class MainDashboardApp : ViewBase
     public override object? Build()
     {
         return new Card(
-            Layout.Wrap(AppList.Select(el => new Button(el)))
+            Layout.Grid()
+                .Columns(4)
+                .Gap(8)
+                .Padding(16)
+                | AppList.Select(el => new Button(el))
         );
     }
 }
