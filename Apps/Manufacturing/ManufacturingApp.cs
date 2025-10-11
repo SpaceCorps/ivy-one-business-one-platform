@@ -160,7 +160,9 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var refresh = this.UseState(0);
         
+        // Reload from database on each render to get fresh data
         var workOrder = context.WorkOrders
             .Include(wo => wo.Product)
             .FirstOrDefault(wo => wo.Id == workOrderId);
@@ -188,7 +190,6 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
             ).Title(workOrder.WorkOrderNumber))
             .Add(new Card(
                 new {
-                    WorkOrderNumber = workOrder.WorkOrderNumber,
                     ProductName = workOrder.ProductName,
                     Quantity = workOrder.Quantity,
                     Priority = workOrder.Priority,
@@ -202,37 +203,179 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                     Notes = workOrder.Notes
                 }
                 .ToDetails()
-                .Remove(x => x.WorkOrderNumber)
                 .RemoveEmpty()
                 .MultiLine(x => x.Notes)
-                .Builder(x => x.WorkOrderNumber, b => b.CopyToClipboard())
             ).Title("Work Order Details"))
             .Add(new Card(
                 Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("Update Progress", _ => client.Toast("Update progress"))
-                        .Variant(ButtonVariant.Primary))
-                    .Add(workOrder.Status != "Completed" 
-                        ? new Button("Complete", _ => {
-                            workOrder.Status = "Completed";
-                            workOrder.Progress = 100;
-                            workOrder.CompletionDate = DateTime.UtcNow;
-                            context.SaveChanges();
-                            client.Toast("Work order completed");
-                            return default;
-                        })
-                            .Variant(ButtonVariant.Success)
-                        : null)
+                    .Gap(8)
+                    .Wrap(true)
+                    // Start Production - тільки для Scheduled
                     .Add(workOrder.Status == "Scheduled" 
                         ? new Button("Start Production", _ => {
-                            workOrder.Status = "In Production";
-                            workOrder.StartDate = DateTime.UtcNow;
-                            context.SaveChanges();
-                            client.Toast("Production started");
+                            var wo = context.WorkOrders.Find(workOrderId);
+                            if (wo != null)
+                            {
+                                wo.Status = "In Production";
+                                wo.StartDate = DateTime.UtcNow;
+                                context.SaveChanges();
+                                refresh.Value++;
+                                client.Toast($"Production started for {wo.WorkOrderNumber}");
+                            }
                             return default;
                         })
+                            .Icon(Icons.Play)
                             .Variant(ButtonVariant.Primary)
                         : null)
+                    // Update Progress - для Scheduled і In Production
+                    .Add(workOrder.Status != "Completed" && workOrder.Status != "Cancelled"
+                        ? new Button("Update Progress")
+                            .Icon(Icons.TrendingUp)
+                            .Variant(ButtonVariant.Secondary)
+                            .WithSheet(
+                                () => new UpdateProgressSheet(workOrderId, refresh, context, client),
+                                title: "Update Progress",
+                                description: $"Update progress for {workOrder.WorkOrderNumber}",
+                                width: Size.Fraction(1/3f)
+                            )
+                        : null)
+                    // Complete - тільки для In Production
+                    .Add(workOrder.Status == "In Production" 
+                        ? new Button("Complete", _ => {
+                            var wo = context.WorkOrders.Find(workOrderId);
+                            if (wo != null)
+                            {
+                                wo.Status = "Completed";
+                                wo.Progress = 100;
+                                wo.CompletionDate = DateTime.UtcNow;
+                                context.SaveChanges();
+                                refresh.Value++;
+                                client.Toast($"Work order {wo.WorkOrderNumber} completed successfully!");
+                            }
+                            return default;
+                        })
+                            .Icon(Icons.Check)
+                            .Variant(ButtonVariant.Success)
+                        : null)
+                    // Cancel - для всіх крім Completed і Cancelled
+                    .Add(workOrder.Status != "Completed" && workOrder.Status != "Cancelled"
+                        ? new Button("Cancel Order", _ => {
+                            var wo = context.WorkOrders.Find(workOrderId);
+                            if (wo != null)
+                            {
+                                wo.Status = "Cancelled";
+                                context.SaveChanges();
+                                refresh.Value++;
+                                client.Toast($"Work order {wo.WorkOrderNumber} cancelled");
+                            }
+                            return default;
+                        })
+                            .Icon(Icons.X)
+                            .Variant(ButtonVariant.Destructive)
+                        : null)
+                    // Reopen - тільки для Completed або Cancelled
+                    .Add(workOrder.Status == "Completed" || workOrder.Status == "Cancelled"
+                        ? new Button("Reopen", _ => {
+                            var wo = context.WorkOrders.Find(workOrderId);
+                            if (wo != null)
+                            {
+                                wo.Status = wo.Progress > 0 ? "In Production" : "Scheduled";
+                                wo.CompletionDate = null;
+                                context.SaveChanges();
+                                refresh.Value++;
+                                client.Toast($"Work order {wo.WorkOrderNumber} reopened");
+                            }
+                            return default;
+                        })
+                            .Icon(Icons.RotateCcw)
+                            .Variant(ButtonVariant.Outline)
+                        : null)
             ).Title("Actions"));
+    }
+}
+
+public class UpdateProgressSheet : ViewBase
+{
+    private readonly int _workOrderId;
+    private readonly IState<int> _refresh;
+    private readonly ApplicationDbContext _context;
+    private readonly IClientProvider _client;
+
+    public UpdateProgressSheet(int workOrderId, IState<int> refresh, ApplicationDbContext context, IClientProvider client)
+    {
+        _workOrderId = workOrderId;
+        _refresh = refresh;
+        _context = context;
+        _client = client;
+    }
+
+    public override object? Build()
+    {
+        var workOrder = _context.WorkOrders.Find(_workOrderId);
+        if (workOrder == null)
+            return "Work order not found";
+
+        var progress = this.UseState(workOrder.Progress.ToString());
+        var notes = this.UseState(workOrder.Notes ?? "");
+
+        return new FooterLayout(
+            Layout.Horizontal().Gap(8)
+                .Add(new Button("Update", _ => {
+                    if (!int.TryParse(progress.Value, out var progressValue) || progressValue < 0 || progressValue > 100)
+                    {
+                        _client.Toast("Progress must be between 0 and 100");
+                        return default;
+                    }
+
+                    var wo = _context.WorkOrders.Find(_workOrderId);
+                    if (wo != null)
+                    {
+                        wo.Progress = progressValue;
+                        wo.Notes = string.IsNullOrWhiteSpace(notes.Value) ? null : notes.Value;
+
+                        // Auto-update status based on progress
+                        if (progressValue == 100 && wo.Status != "Completed")
+                        {
+                            wo.Status = "Completed";
+                            wo.CompletionDate = DateTime.UtcNow;
+                        }
+                        else if (progressValue > 0 && wo.Status == "Scheduled")
+                        {
+                            wo.Status = "In Production";
+                            wo.StartDate = DateTime.UtcNow;
+                        }
+
+                        _context.SaveChanges();
+                        _refresh.Value++;
+                        _client.Toast($"Progress updated to {progressValue}%");
+                    }
+                    return default;
+                })
+                .Variant(ButtonVariant.Primary))
+                .Add(new Button("Cancel")
+                    .Variant(ButtonVariant.Outline)),
+            Layout.Vertical()
+                .Gap(16)
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("Current Progress"))
+                        .Add(new Progress(workOrder.Progress))
+                        .Add(Text.Small($"{workOrder.Progress}% Complete"))
+                ).Title("Current Status"))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("New Progress (0-100) *"))
+                        .Add(progress.ToTextInput().Placeholder("Enter progress percentage"))
+                        .Add(Text.Muted("Enter a value between 0 and 100"))
+                ).Title("Update Progress"))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("Notes (Optional)"))
+                        .Add(notes.ToTextInput().Placeholder("Add update notes..."))
+                ).Title("Additional Notes"))
+        );
     }
 }
