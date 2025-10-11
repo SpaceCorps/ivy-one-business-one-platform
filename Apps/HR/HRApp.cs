@@ -196,6 +196,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
             DepartmentId = departments.FirstOrDefault()?.Id ?? 0
         });
         
+        var departmentId = this.UseState(employeeForm.Value.DepartmentId);
         var statusOptions = new[] { "Active", "Inactive", "Terminated" };
         
         return new FooterLayout(
@@ -261,7 +262,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                                 existingEmployee.Status = employeeForm.Value.Status;
                                 existingEmployee.HireDate = employeeForm.Value.HireDate;
                                 existingEmployee.TerminationDate = employeeForm.Value.TerminationDate;
-                                existingEmployee.DepartmentId = employeeForm.Value.DepartmentId;
+                                existingEmployee.DepartmentId = departmentId.Value;
                                 existingEmployee.UpdatedAt = DateTime.UtcNow;
                             }
                             else
@@ -279,7 +280,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                                     Status = employeeForm.Value.Status,
                                     HireDate = employeeForm.Value.HireDate,
                                     TerminationDate = employeeForm.Value.TerminationDate,
-                                    DepartmentId = employeeForm.Value.DepartmentId,
+                                    DepartmentId = departmentId.Value,
                                     CreatedAt = DateTime.UtcNow,
                                     UpdatedAt = DateTime.UtcNow
                                 };
@@ -345,11 +346,9 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                             employeeForm.Set(updated);
                         }).Placeholder("Software Engineer"))
                         .Add(Text.Small("Department"))
-                        .Add(new SelectInput<int>(employeeForm.Value.DepartmentId, e => {
-                            var updated = employeeForm.Value;
-                            updated.DepartmentId = e.Value;
-                            employeeForm.Set(updated);
-                        }, departments.Select(d => new SelectOption { Label = d.Name, Value = d.Id }).ToArray()))
+                        .Add(new SelectInput<int>(departmentId.Value, e => {
+                            departmentId.Set(e.Value);
+                        }, departments.Select(d => $"{d.Id}:{d.Name}").ToOptions()))
                         .Add(Text.Small("Salary ($)"))
                         .Add(new NumberInput<decimal>(employeeForm.Value.Salary, v => {
                             var updated = employeeForm.Value;
