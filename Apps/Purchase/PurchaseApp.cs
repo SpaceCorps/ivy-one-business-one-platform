@@ -5,7 +5,7 @@ public class PurchaseApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new PurchaseRootBlade(), "Purchase", Size.Units(80));
+        return this.UseBlades(() => new PurchaseRootBlade(), "Purchase", Size.Units(110));
     }
 }
 

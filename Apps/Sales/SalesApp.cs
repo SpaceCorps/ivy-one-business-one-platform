@@ -5,7 +5,7 @@ public class SalesApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new SalesRootBlade(), "Sales", Size.Units(80));
+        return this.UseBlades(() => new SalesRootBlade(), "Sales", Size.Units(110));
     }
 }
 
