@@ -8,65 +8,78 @@ public class TimesheetsApp : ViewBase
 {
     public override object? Build()
     {
+        return this.UseBlades(() => new TimesheetsRootBlade(), "Timesheets");
+    }
+}
+
+public class TimesheetsRootBlade : ViewBase
+{
+    public override object? Build()
+    {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
         
         var timesheets = context.Timesheets.Include(t => t.Project).OrderByDescending(t => t.Date).ToList();
         var thisWeek = timesheets.Where(t => t.Date >= DateTime.Now.AddDays(-7)).Sum(t => t.HoursWorked);
-        var pending = timesheets.Count(t => t.Status == "Draft" || t.Status == "Submitted");
+        
+        var listItems = timesheets.Select(ts => new ListItem(
+            title: $"{ts.EmployeeName} - {ts.Project?.Name ?? "No Project"}",
+            subtitle: $"{ts.Date:MMM dd, yyyy} - {ts.HoursWorked:F1}h - {ts.Description}",
+            icon: Icons.Clock,
+            badge: ts.Status,
+            onClick: _ => { blades.Push(this, new TimesheetDetailBlade(ts.Id), $"Timesheet {ts.Date:MMM dd}"); }
+        ));
+        
+        return BladeHelper.WithHeader(
+            Layout.Vertical()
+                .Gap(12)
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("This Week").Add($"{thisWeek:F1}h")))
+                .Add(new Button("Log Time", _ => client.Toast("Log time"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)),
+            timesheets.Count == 0 
+                ? "No timesheet entries."
+                : new List(listItems)
+        );
+    }
+}
+
+public class TimesheetDetailBlade(int timesheetId) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var timesheet = context.Timesheets.Include(t => t.Project).FirstOrDefault(t => t.Id == timesheetId);
+        
+        if (timesheet == null)
+            return "Timesheet not found";
         
         return new Card(
             Layout.Vertical()
                 .Gap(16)
-                .Padding(24)
-                .Add("Timesheet Management")
-                .Add("Track work hours and submit timesheets")
-                .Add(Layout.Grid()
-                    .Columns(3)
-                    .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("This Week").Add($"{thisWeek:F1}h")))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pending").Add(pending.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total Entries").Add(timesheets.Count.ToString()))))
+                .Padding(16)
+                .Add($"Timesheet - {timesheet.Date:MMM dd, yyyy}")
+                .Add(Layout.Vertical()
+                    .Gap(8)
+                    .Add($"Employee: {timesheet.EmployeeName}")
+                    .Add($"Project: {timesheet.Project?.Name ?? "No Project"}")
+                    .Add($"Hours: {timesheet.HoursWorked:F1}h")
+                    .Add($"Description: {timesheet.Description}")
+                    .Add(new Badge(timesheet.Status)
+                        .Variant(timesheet.Status == "Approved" ? BadgeVariant.Success :
+                               timesheet.Status == "Rejected" ? BadgeVariant.Destructive :
+                               BadgeVariant.Secondary)))
                 .Add(Layout.Horizontal()
                     .Gap(12)
-                    .Add(new Button("Log Time", _ => client.Toast("Log time entry"))
-                        .Icon(Icons.Plus)
+                    .Add(new Button("Edit", _ => client.Toast("Edit timesheet"))
                         .Variant(ButtonVariant.Primary))
-                    .Add(new Button("Submit Week", _ => client.Toast("Submit timesheet for approval"))
-                        .Variant(ButtonVariant.Success)))
-                .Add(BuildTimesheetsList(timesheets, client))
+                    .Add(timesheet.Status == "Draft" 
+                        ? new Button("Submit", _ => client.Toast("Submit for approval"))
+                            .Variant(ButtonVariant.Success)
+                        : null))
         );
-    }
-
-    private object BuildTimesheetsList(List<Timesheet> timesheets, IClientProvider client)
-    {
-        if (timesheets.Count == 0)
-            return new Card(Layout.Vertical().Padding(16).Add("No time entries found. Log your first entry!"));
-        
-        var cards = timesheets.Take(10).Select(ts => new Card(
-            Layout.Horizontal()
-                .Gap(12)
-                .Padding(16)
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(ts.EmployeeName)
-                    .Add(ts.Project?.Name ?? "No Project")
-                    .Add(ts.Description)
-                    .Add(Layout.Horizontal()
-                        .Gap(8)
-                        .Add(new Badge(ts.Status)
-                            .Variant(ts.Status == "Approved" ? BadgeVariant.Success :
-                                   ts.Status == "Rejected" ? BadgeVariant.Destructive :
-                                   BadgeVariant.Secondary))
-                        .Add(new Badge($"{ts.HoursWorked:F1}h").Variant(BadgeVariant.Info))))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(ts.Date.ToString("MMM dd, yyyy"))
-                    .Add(new Button("Edit", _ => client.Toast($"Editing timesheet"))
-                        .Small()
-                        .Variant(ButtonVariant.Outline)))
-        ));
-        
-        return Layout.Vertical().Gap(8).Add(cards);
     }
 }
