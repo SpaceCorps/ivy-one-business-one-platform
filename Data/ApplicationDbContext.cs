@@ -49,6 +49,9 @@ public class ApplicationDbContext : DbContext
     // Subscriptions
     public DbSet<Subscription> Subscriptions { get; set; }
 
+    // Purchase orders
+    public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

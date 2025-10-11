@@ -68,5 +68,49 @@ public static class DatabaseService
 
         await context.Accounts.AddRangeAsync(accounts);
         await context.SaveChangesAsync();
+
+        // Seed purchase orders
+        var purchaseOrders = new[]
+        {
+            new PurchaseOrder 
+            { 
+                OrderNumber = "PO-001", 
+                Supplier = "Office Supplies Co", 
+                Amount = 1250.00m, 
+                Status = PurchaseOrderStatus.Pending,
+                OrderDate = DateTime.UtcNow.AddDays(-7),
+                ExpectedDeliveryDate = DateTime.UtcNow.AddDays(14),
+                PaymentTerms = "Net 30",
+                Department = "Operations",
+                Notes = "Monthly office supplies order"
+            },
+            new PurchaseOrder 
+            { 
+                OrderNumber = "PO-002", 
+                Supplier = "Tech Equipment Ltd", 
+                Amount = 5400.00m, 
+                Status = PurchaseOrderStatus.Approved,
+                OrderDate = DateTime.UtcNow.AddDays(-14),
+                ExpectedDeliveryDate = DateTime.UtcNow.AddDays(7),
+                PaymentTerms = "Net 45",
+                Department = "IT",
+                Notes = "New laptops for development team"
+            },
+            new PurchaseOrder 
+            { 
+                OrderNumber = "PO-003", 
+                Supplier = "Furniture World", 
+                Amount = 3200.00m, 
+                Status = PurchaseOrderStatus.Received,
+                OrderDate = DateTime.UtcNow.AddDays(-30),
+                ExpectedDeliveryDate = DateTime.UtcNow.AddDays(-10),
+                PaymentTerms = "Net 30",
+                Department = "Facilities",
+                Notes = "Conference room furniture"
+            }
+        };
+
+        await context.PurchaseOrders.AddRangeAsync(purchaseOrders);
+        await context.SaveChangesAsync();
     }
 }
