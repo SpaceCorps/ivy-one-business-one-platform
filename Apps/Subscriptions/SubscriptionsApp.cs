@@ -8,95 +8,86 @@ public class SubscriptionsApp : ViewBase
 {
     public override object? Build()
     {
+        return this.UseBlades(() => new SubscriptionsRootBlade(), "Subscriptions");
+    }
+}
+
+public class SubscriptionsRootBlade : ViewBase
+{
+    public override object? Build()
+    {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        
-        var selectedView = this.UseState("active");
+        var blades = this.UseContext<IBladeController>();
         
         var subscriptions = context.Subscriptions.ToList();
         var activeCount = subscriptions.Count(s => s.Status == "Active");
         var monthlyRevenue = subscriptions.Where(s => s.Status == "Active").Sum(s => s.MonthlyAmount);
         
-        return new Card(
+        var listItems = subscriptions.Select(sub => new ListItem(
+            title: $"{sub.CustomerName} - {sub.PlanName}",
+            subtitle: $"${sub.MonthlyAmount:N2}/{sub.BillingCycle} - Next: {sub.NextBillingDate:MMM dd}",
+            icon: Icons.RefreshCw,
+            badge: sub.Status,
+            onClick: _ => blades.Push(this, new SubscriptionDetailBlade(sub.Id), sub.CustomerName)
+        ));
+        
+        return BladeHelper.WithHeader(
             Layout.Vertical()
-                .Gap(16)
-                .Padding(24)
-                .Add("Subscription Management")
-                .Add("Manage recurring billing and customer subscriptions")
+                .Gap(12)
                 .Add(Layout.Grid()
                     .Columns(3)
                     .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
-                        .Add("Active Subscriptions").Add(activeCount.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
-                        .Add("Monthly Revenue").Add($"${monthlyRevenue:N2}")))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
-                        .Add("Total Subscriptions").Add(subscriptions.Count.ToString()))))
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("Active", _ => selectedView.Set("active"))
-                        .Variant(selectedView.Value == "active" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Cancelled", _ => selectedView.Set("cancelled"))
-                        .Variant(selectedView.Value == "cancelled" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("All", _ => selectedView.Set("all"))
-                        .Variant(selectedView.Value == "all" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("New Subscription", _ => client.Toast("Create new subscription"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Success)))
-                .Add(BuildSubscriptionsList(context, selectedView.Value, client))
+                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Active").Add(activeCount.ToString())))
+                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Monthly Revenue").Add($"${monthlyRevenue:N2}")))
+                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(subscriptions.Count.ToString()))))
+                .Add(new Button("New Subscription", _ => client.Toast("Create subscription"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)),
+            subscriptions.Count == 0 
+                ? "No subscriptions found."
+                : new List(listItems)
         );
     }
+}
 
-    private object BuildSubscriptionsList(ApplicationDbContext context, string filter, IClientProvider client)
+public class SubscriptionDetailBlade(int subscriptionId) : ViewBase
+{
+    public override object? Build()
     {
-        var query = context.Subscriptions.AsQueryable();
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
         
-        if (filter == "active")
-            query = query.Where(s => s.Status == "Active");
-        else if (filter == "cancelled")
-            query = query.Where(s => s.Status == "Cancelled");
-            
-        var subscriptions = query.OrderByDescending(s => s.StartDate).ToList();
+        var subscription = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
         
-        if (subscriptions.Count == 0)
-            return new Card(Layout.Vertical().Padding(16).Add("No subscriptions found."));
+        if (subscription == null)
+            return "Subscription not found";
         
-        var cards = subscriptions.Select(sub => new Card(
-            Layout.Horizontal()
-                .Gap(12)
+        return new Card(
+            Layout.Vertical()
+                .Gap(16)
                 .Padding(16)
+                .Add($"{subscription.CustomerName} - {subscription.PlanName}")
                 .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(sub.CustomerName)
-                    .Add(sub.CustomerEmail)
-                    .Add($"Plan: {sub.PlanName}")
-                    .Add(Layout.Horizontal()
-                        .Gap(8)
-                        .Add(new Badge(sub.Status)
-                            .Variant(sub.Status == "Active" ? BadgeVariant.Success :
-                                   sub.Status == "Cancelled" ? BadgeVariant.Destructive :
-                                   BadgeVariant.Warning))
-                        .Add(new Badge($"${sub.MonthlyAmount:N2}/{sub.BillingCycle}")
-                            .Variant(BadgeVariant.Info))
-                        .Add(sub.NextBillingDate.HasValue 
-                            ? new Badge($"Next: {sub.NextBillingDate.Value:MMM dd}")
-                                .Variant(BadgeVariant.Outline)
-                            : null)))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"Started: {sub.StartDate:MMM dd, yyyy}")
-                    .Add(Layout.Horizontal()
-                        .Gap(4)
-                        .Add(new Button("View", _ => client.Toast($"Viewing: {sub.CustomerName}"))
-                            .Small()
-                            .Variant(ButtonVariant.Primary))
-                        .Add(sub.Status == "Active" 
-                            ? new Button("Cancel", _ => client.Toast($"Cancelling subscription"))
-                                .Small()
-                                .Variant(ButtonVariant.Destructive)
-                            : null)))
-        ));
-        
-        return Layout.Vertical().Gap(8).Add(cards);
+                    .Gap(8)
+                    .Add($"Customer: {subscription.CustomerName}")
+                    .Add($"Email: {subscription.CustomerEmail}")
+                    .Add($"Plan: {subscription.PlanName}")
+                    .Add($"Amount: ${subscription.MonthlyAmount:N2}/{subscription.BillingCycle}")
+                    .Add($"Started: {subscription.StartDate:MMM dd, yyyy}")
+                    .Add(subscription.NextBillingDate.HasValue ? $"Next Billing: {subscription.NextBillingDate.Value:MMM dd, yyyy}" : "No next billing")
+                    .Add(new Badge(subscription.Status)
+                        .Variant(subscription.Status == "Active" ? BadgeVariant.Success :
+                               subscription.Status == "Cancelled" ? BadgeVariant.Destructive :
+                               BadgeVariant.Warning)))
+                .Add(Layout.Horizontal()
+                    .Gap(12)
+                    .Add(new Button("Edit", _ => client.Toast("Edit subscription"))
+                        .Variant(ButtonVariant.Primary))
+                    .Add(subscription.Status == "Active" 
+                        ? new Button("Cancel Subscription", _ => client.Toast("Subscription cancelled"))
+                            .Variant(ButtonVariant.Destructive)
+                        : null))
+        );
     }
 }
