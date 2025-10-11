@@ -3,3 +3,6 @@ obj/
 *.sln.iml
 .idea/**/*
 **/.idea/*
+*.db
+*.db-shm
+*.db-wal
