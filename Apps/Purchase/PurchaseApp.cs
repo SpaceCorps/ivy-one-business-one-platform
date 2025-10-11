@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace IvyOneBusinessOnePlatform.Apps.Purchase;
 
 [App(icon: Icons.ShoppingBag, title: "Purchase", path: new[] { "Business Operations" })]
@@ -24,10 +26,11 @@ public class PurchaseRootBlade : ViewBase
         
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
+            var searchPattern = $"%{searchQuery.Value}%";
             query = query.Where(po => 
-                po.OrderNumber.Contains(searchQuery.Value) ||
-                po.Supplier.Contains(searchQuery.Value) ||
-                po.Department.Contains(searchQuery.Value));
+                EF.Functions.Like(po.OrderNumber, searchPattern) ||
+                EF.Functions.Like(po.Supplier, searchPattern) ||
+                EF.Functions.Like(po.Department, searchPattern));
         }
         
         var orders = query.OrderByDescending(po => po.OrderDate).ToList();
@@ -239,6 +242,37 @@ public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null)
                     .HandleClick(_ => {
                         try
                         {
+                            // Client-side validation
+                            if (string.IsNullOrWhiteSpace(orderForm.Value.OrderNumber))
+                            {
+                                client.Toast("Order Number is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (string.IsNullOrWhiteSpace(orderForm.Value.Supplier))
+                            {
+                                client.Toast("Supplier is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (orderForm.Value.Amount <= 0)
+                            {
+                                client.Toast("Amount must be greater than zero", "Validation Error");
+                                return;
+                            }
+                            
+                            if (orderForm.Value.OrderNumber.Length > 50)
+                            {
+                                client.Toast("Order Number cannot exceed 50 characters", "Validation Error");
+                                return;
+                            }
+                            
+                            if (orderForm.Value.Supplier.Length > 200)
+                            {
+                                client.Toast("Supplier name cannot exceed 200 characters", "Validation Error");
+                                return;
+                            }
+                            
                             if (isEdit && existingOrder != null)
                             {
                                 // Update existing order
