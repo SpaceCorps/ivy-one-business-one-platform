@@ -17,6 +17,7 @@ public class PurchaseRootBlade : ViewBase
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
+        var isNewPOOpen = this.UseState(false);
         
         var query = context.PurchaseOrders.AsQueryable();
         
@@ -38,23 +39,25 @@ public class PurchaseRootBlade : ViewBase
             onClick: _ => blades.Push(this, new PurchaseOrderDetailBlade(order.Id), order.OrderNumber)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
-                .Gap(4)
-                .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
-                .Add(new Button("New PO")
-                    .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)
-                    .WithSheet(
-                        () => new PurchaseOrderFormSheet(),
-                        title: "New Purchase Order",
-                        description: "Create a new purchase order",
-                        width: Size.Fraction(2/3f)
-                    )),
-            orders.Count == 0 
-                ? Text.Block("No purchase orders found. Try a different search or create your first order!")
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Add(BladeHelper.WithHeader(
+                Layout.Horizontal()
+                    .Gap(4)
+                    .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
+                    .Add(new Button("New PO")
+                        .Icon(Icons.Plus)
+                        .Variant(ButtonVariant.Primary)
+                        .HandleClick(_ => isNewPOOpen.Set(true))),
+                orders.Count == 0 
+                    ? Text.Block("No purchase orders found. Try a different search or create your first order!")
+                    : new List(listItems)
+            ))
+            .Add(isNewPOOpen.Value ? new Sheet(
+                (Event<Sheet> _) => isNewPOOpen.Set(false),
+                new PurchaseOrderFormSheet(null, () => isNewPOOpen.Set(false)),
+                title: "New Purchase Order",
+                description: "Create a new purchase order"
+            ).Width(Size.Fraction(2/3f)) : null);
     }
 }
 
@@ -78,6 +81,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
         }
         
         var currentStatus = this.UseState(order.Status);
+        var isEditOpen = this.UseState(false);
         
         this.UseEffect(() =>
         {
@@ -135,18 +139,19 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                 .Add(new Button("Edit Order")
                     .Variant(ButtonVariant.Outline)
                     .Icon(Icons.Pencil)
-                    .WithSheet(
-                        () => new PurchaseOrderFormSheet(orderId),
-                        title: "Edit Purchase Order",
-                        description: $"Edit purchase order {order.OrderNumber}",
-                        width: Size.Fraction(2/3f)
-                    ))
+                    .HandleClick(_ => isEditOpen.Set(true)))
                 .Add(new Button("Cancel", _ => blades.Pop())
-                    .Variant(ButtonVariant.Secondary)));
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(isEditOpen.Value ? new Sheet(
+                (Event<Sheet> _) => isEditOpen.Set(false),
+                new PurchaseOrderFormSheet(orderId, () => isEditOpen.Set(false)),
+                title: "Edit Purchase Order",
+                description: $"Edit purchase order {order.OrderNumber}"
+            ).Width(Size.Fraction(2/3f)) : null);
     }
 }
 
-public class PurchaseOrderFormSheet(int? orderId = null) : ViewBase
+public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null) : ViewBase
 {
     public override object? Build()
     {
@@ -222,6 +227,7 @@ public class PurchaseOrderFormSheet(int? orderId = null) : ViewBase
                             
                             context.SaveChanges();
                             client.Toast(isEdit ? "Purchase order updated successfully!" : "Purchase order created successfully!");
+                            onClose?.Invoke();
                         }
                         catch (Exception ex)
                         {
@@ -230,7 +236,7 @@ public class PurchaseOrderFormSheet(int? orderId = null) : ViewBase
                     }))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
-                    .HandleClick(_ => client.Toast("Cancelled"))),
+                    .HandleClick(_ => onClose?.Invoke())),
             
             Layout.Vertical().Gap(4)
                 .Add(new Card(
