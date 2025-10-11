@@ -30,11 +30,15 @@ public class SocialMarketingRootBlade : ViewBase
             onClick: _ => { client.Toast($"{platform.Name} management"); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Create Post", _ => client.Toast("Create post"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Social Media Posts"))
+                .Add(new Button("Create Post", _ => client.Toast("Create post"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }

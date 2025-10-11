@@ -31,12 +31,16 @@ public class PurchaseRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new PurchaseOrderDetailBlade(order.Id, order.Supplier, order.Amount, order.Status), order.Id); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Purchase Order", _ => client.Toast("Create PO"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Purchase Orders"))
+                .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

@@ -31,12 +31,16 @@ public class SalesRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new SalesOrderDetailBlade(order.Id, order.Customer, order.Amount, order.Status), order.Id); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Order", _ => client.Toast("Create sales order"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Sales Orders"))
+                .Add(new Button("New Order", _ => client.Toast("Create sales order"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

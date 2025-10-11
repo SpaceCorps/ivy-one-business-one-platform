@@ -31,12 +31,16 @@ public class HelpdeskRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new TicketDetailBlade(ticket.Id, ticket.Customer, ticket.Subject, ticket.Status, ticket.Priority), ticket.Id); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Ticket", _ => client.Toast("Create ticket"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Support Tickets"))
+                .Add(new Button("New Ticket", _ => client.Toast("Create ticket"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

@@ -30,17 +30,19 @@ public class HRRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new EmployeeDetailBlade(emp.Id), $"{emp.FirstName} {emp.LastName}"); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Human Resources"))
+            .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total Employees").Add(employees.Count.ToString())))
+            .Add(Layout.Horizontal()
                 .Gap(12)
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total Employees").Add(employees.Count.ToString())))
                 .Add(new Button("Add Employee", _ => client.Toast("Add employee"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            employees.Count == 0 
-                ? "No employees yet."
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(employees.Count == 0 
+                ? Text.Block("No employees yet.")
+                : new List(listItems));
     }
 }
 

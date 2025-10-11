@@ -31,12 +31,16 @@ public class ManufacturingRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new WorkOrderDetailBlade(wo.Id, wo.Product, wo.Quantity, wo.Status, wo.Progress), wo.Id); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Work Order", _ => client.Toast("Create work order"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Manufacturing Orders"))
+                .Add(new Button("New Work Order", _ => client.Toast("Create work order"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

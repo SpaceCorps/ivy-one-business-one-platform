@@ -65,12 +65,16 @@ public class ProjectsBlade : ViewBase
             onClick: _ => blades.Push(this, new ProjectDetailBlade(proj.Name), proj.Name)
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Project", _ => client.Toast("Create project"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Projects"))
+                .Add(new Button("New Project", _ => client.Toast("Create project"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 
@@ -110,12 +114,16 @@ public class EditorBlade : ViewBase
             onClick: _ => client.Toast($"Opening {file}")
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New File", _ => client.Toast("Create file"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Code Editor"))
+                .Add(new Button("New File", _ => client.Toast("Create file"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

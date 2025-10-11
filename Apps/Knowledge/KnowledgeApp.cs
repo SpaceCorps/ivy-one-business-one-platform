@@ -43,21 +43,21 @@ public class KnowledgeRootBlade : ViewBase
             onClick: _ => blades.Push(this, new ArticleDetailBlade(article.Id), article.Title)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
                 .Gap(12)
-                .Add(searchQuery.ToSearchInput().Placeholder("Search articles..."))
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("New Article", _ => client.Toast("Create article"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary))
-                    .Add(new Button("Categories", _ => blades.Push(this, new CategoriesBlade(), "Categories"))
-                        .Variant(ButtonVariant.Secondary))),
-            articles.Count == 0 
-                ? "No articles found. Create your first article!"
-                : new List(listItems)
-        );
+                .Add(Text.H3("Knowledge Base"))
+                .Add(new Button("New Article", _ => client.Toast("Create article"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary))
+                .Add(new Button("Categories", _ => blades.Push(this, new CategoriesBlade(), "Categories"))
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(searchQuery.ToSearchInput().Placeholder("Search articles..."))
+            .Add(articles.Count == 0 
+                ? Text.Block("No articles found. Create your first article!")
+                : new List(listItems));
     }
 }
 
@@ -121,14 +121,18 @@ public class CategoriesBlade : ViewBase
             onClick: _ => blades.Push(this, new CategoryDetailBlade(category.Id), category.Name)
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Category", _ => client.Toast("Create category"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            categories.Count == 0 
-                ? "No categories found. Create your first category!"
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Categories"))
+                .Add(new Button("New Category", _ => client.Toast("Create category"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(categories.Count == 0 
+                ? Text.Block("No categories found. Create your first category!")
+                : new List(listItems));
     }
 }
 

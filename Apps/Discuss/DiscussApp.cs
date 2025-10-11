@@ -54,14 +54,16 @@ public class ChannelBlade(string channelName) : ViewBase
             icon: Icons.User
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3($"#{channelName}"))
+            .Add(new List(listItems))
+            .Add(Layout.Horizontal()
                 .Gap(8)
                 .Add(new TextInput(UseState("")).Placeholder("Type your message..."))
                 .Add(new Button("Send", _ => client.Toast("Message sent!"))
                     .Variant(ButtonVariant.Primary)
-                    .Icon(Icons.Send)),
-            new List(listItems)
-        );
+                    .Icon(Icons.Send)));
     }
 }

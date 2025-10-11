@@ -46,19 +46,22 @@ public class AccountingRootBlade : ViewBase
                 onClick: _ => blades.Push(this, new TransactionsBlade(), "Transactions"))
         };
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
-                .Gap(12)
-                .Add("Financial Dashboard")
-                .Add(Layout.Grid()
-                    .Columns(2)
-                    .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
-                        .Add("Total Revenue").Add($"${totalRevenue:N2}").Add("Paid invoices")))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
-                        .Add("Pending").Add($"${pendingInvoices:N2}").Add("Unpaid amount")))),
-            new List(menuItems)
-        );
+        return Layout.Vertical()
+            .Gap(24)
+            .Padding(24)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(16)
+                    .Padding(16)
+                    .Add(Text.H3("Financial Dashboard"))
+                    .Add(Layout.Grid()
+                        .Columns(2)
+                        .Gap(12)
+                        .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
+                            .Add("Total Revenue").Add($"${totalRevenue:N2}").Add("Paid invoices")))
+                        .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
+                            .Add("Pending").Add($"${pendingInvoices:N2}").Add("Unpaid amount"))))))
+            .Add(new List(menuItems));
     }
 }
 
@@ -80,16 +83,18 @@ public class InvoicesBlade : ViewBase
             onClick: _ => blades.Push(this, new InvoiceDetailBlade(invoice.Id), $"Invoice {invoice.InvoiceNumber}")
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
                 .Gap(12)
+                .Add(Text.H3("Invoices"))
                 .Add(new Button("Create Invoice", _ => client.Toast("Create invoice"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            invoices.Count == 0 
-                ? "No invoices found. Create your first invoice!"
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(invoices.Count == 0 
+                ? Text.Block("No invoices found. Create your first invoice!")
+                : new List(listItems));
     }
 }
 
@@ -157,16 +162,18 @@ public class AccountsBlade : ViewBase
             onClick: _ => blades.Push(this, new AccountDetailBlade(account.Id), account.AccountName)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
                 .Gap(12)
+                .Add(Text.H3("Chart of Accounts"))
                 .Add(new Button("Add Account", _ => client.Toast("Add account"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            accounts.Count == 0 
-                ? "No accounts found. Add your first account!"
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(accounts.Count == 0 
+                ? Text.Block("No accounts found. Add your first account!")
+                : new List(listItems));
     }
 }
 
@@ -222,16 +229,18 @@ public class TransactionsBlade : ViewBase
             onClick: _ => blades.Push(this, new TransactionDetailBlade(transaction.Id), transaction.TransactionNumber)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
                 .Gap(12)
+                .Add(Text.H3("Transactions"))
                 .Add(new Button("Add Transaction", _ => client.Toast("Add transaction"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            transactions.Count == 0 
-                ? "No transactions found. Add your first transaction!"
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(transactions.Count == 0 
+                ? Text.Block("No transactions found. Add your first transaction!")
+                : new List(listItems));
     }
 }
 

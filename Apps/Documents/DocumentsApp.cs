@@ -30,21 +30,23 @@ public class DocumentsRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new DocumentDetailBlade(doc.Id), doc.Title); }
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Documents"))
+            .Add(Layout.Grid()
+                .Columns(2)
                 .Gap(12)
-                .Add(Layout.Grid()
-                    .Columns(2)
-                    .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(documents.Count.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Public").Add(documents.Count(d => d.IsPublic).ToString()))))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(documents.Count.ToString())))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Public").Add(documents.Count(d => d.IsPublic).ToString()))))
+            .Add(Layout.Horizontal()
+                .Gap(12)
                 .Add(new Button("Upload Document", _ => client.Toast("Upload document"))
                     .Icon(Icons.Upload)
-                    .Variant(ButtonVariant.Primary)),
-            documents.Count == 0 
-                ? "No documents found."
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(documents.Count == 0 
+                ? Text.Block("No documents found.")
+                : new List(listItems));
     }
 }
 

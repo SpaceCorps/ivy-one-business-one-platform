@@ -30,14 +30,18 @@ public class ProjectRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new ProjectDetailBlade(proj.Id), proj.Name); }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Project", _ => client.Toast("Create project"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            projects.Count == 0 
-                ? "No projects found."
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Projects"))
+                .Add(new Button("New Project", _ => client.Toast("Create project"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(projects.Count == 0 
+                ? Text.Block("No projects found.")
+                : new List(listItems));
     }
 }
 

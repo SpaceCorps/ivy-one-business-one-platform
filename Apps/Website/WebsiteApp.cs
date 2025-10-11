@@ -32,12 +32,16 @@ public class WebsiteRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new PageDetailBlade(page.Name, page.Status, page.Views), page.Name); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Add Page", _ => client.Toast("Create page"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Website Pages"))
+                .Add(new Button("Add Page", _ => client.Toast("Create page"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

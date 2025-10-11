@@ -30,14 +30,18 @@ public class InventoryRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new ProductDetailBlade(prod.Id), prod.Name); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Add Product", _ => client.Toast("Add product"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            products.Count == 0 
-                ? "No products yet."
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Inventory"))
+                .Add(new Button("Add Product", _ => client.Toast("Add product"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(products.Count == 0 
+                ? Text.Block("No products yet.")
+                : new List(listItems));
     }
 }
 

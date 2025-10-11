@@ -31,16 +31,18 @@ public class RentalRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new PropertyDetailBlade(prop.Name, prop.Type, prop.Status, prop.Price), prop.Name); }
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
                 .Gap(12)
+                .Add(Text.H3("Properties"))
                 .Add(new Button("Add Property", _ => client.Toast("Add property"))
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary))
                 .Add(new Button("Bookings", _ => blades.Push(this, new BookingsBlade(), "Bookings"))
-                    .Variant(ButtonVariant.Secondary)),
-            new List(listItems)
-        );
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(new List(listItems));
     }
 }
 

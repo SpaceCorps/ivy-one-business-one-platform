@@ -32,22 +32,24 @@ public class SignRootBlade : ViewBase
             onClick: _ => blades.Push(this, new SignatureDetailBlade(sig.Id), sig.DocumentTitle)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Digital Signatures"))
+            .Add(Layout.Grid()
+                .Columns(3)
                 .Gap(12)
-                .Add(Layout.Grid()
-                    .Columns(3)
-                    .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(signatures.Count.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pending").Add(pending.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Signed").Add(signed.ToString()))))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(signatures.Count.ToString())))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pending").Add(pending.ToString())))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Signed").Add(signed.ToString()))))
+            .Add(Layout.Horizontal()
+                .Gap(12)
                 .Add(new Button("New Signature Request", _ => client.Toast("Create request"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            signatures.Count == 0 
-                ? "No signature requests. Create your first request!"
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(signatures.Count == 0 
+                ? Text.Block("No signature requests. Create your first request!")
+                : new List(listItems));
     }
 }
 

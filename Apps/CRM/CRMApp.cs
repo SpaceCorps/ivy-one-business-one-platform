@@ -43,15 +43,17 @@ public class CRMRootBlade : ViewBase
                 onClick: _ => blades.Push(this, new OpportunitiesBlade(), "Opportunities"))
         };
         
-        return BladeHelper.WithHeader(
-            Layout.Grid()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("CRM Dashboard"))
+            .Add(Layout.Grid()
                 .Columns(3)
                 .Gap(12)
                 .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Contacts").Add(contacts.Count.ToString())))
                 .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Leads").Add(leads.Count.ToString())))
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pipeline").Add($"${opportunities.Sum(o => o.Amount):N2}"))),
-            new List(menuItems)
-        );
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pipeline").Add($"${opportunities.Sum(o => o.Amount):N2}"))))
+            .Add(new List(menuItems));
     }
 }
 
@@ -73,14 +75,18 @@ public class ContactsBlade : ViewBase
             onClick: _ => blades.Push(this, new ContactDetailBlade(contact.Id), $"{contact.FirstName} {contact.LastName}")
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Add Contact", _ => client.Toast("Add contact"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            contacts.Count == 0 
-                ? "No contacts found. Add your first contact!"
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Contacts"))
+                .Add(new Button("Add Contact", _ => client.Toast("Add contact"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(contacts.Count == 0 
+                ? Text.Block("No contacts found. Add your first contact!")
+                : new List(listItems));
     }
 }
 
@@ -138,14 +144,18 @@ public class LeadsBlade : ViewBase
             onClick: _ => blades.Push(this, new LeadDetailBlade(lead.Id), $"{lead.FirstName} {lead.LastName}")
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Add Lead", _ => client.Toast("Add lead"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            leads.Count == 0 
-                ? "No leads found. Add your first lead!"
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Leads"))
+                .Add(new Button("Add Lead", _ => client.Toast("Add lead"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(leads.Count == 0 
+                ? Text.Block("No leads found. Add your first lead!")
+                : new List(listItems));
     }
 }
 
@@ -207,14 +217,18 @@ public class OpportunitiesBlade : ViewBase
             onClick: _ => blades.Push(this, new OpportunityDetailBlade(opp.Id), opp.Name)
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("Add Opportunity", _ => client.Toast("Add opportunity"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            opportunities.Count == 0 
-                ? "No opportunities found. Add your first opportunity!"
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Opportunities"))
+                .Add(new Button("Add Opportunity", _ => client.Toast("Add opportunity"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(opportunities.Count == 0 
+                ? Text.Block("No opportunities found. Add your first opportunity!")
+                : new List(listItems));
     }
 }
 

@@ -31,17 +31,19 @@ public class TimesheetsRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new TimesheetDetailBlade(ts.Id), $"Timesheet {ts.Date:MMM dd}"); }
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Timesheets"))
+            .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("This Week").Add($"{thisWeek:F1}h")))
+            .Add(Layout.Horizontal()
                 .Gap(12)
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("This Week").Add($"{thisWeek:F1}h")))
                 .Add(new Button("Log Time", _ => client.Toast("Log time"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            timesheets.Count == 0 
-                ? "No timesheet entries."
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(timesheets.Count == 0 
+                ? Text.Block("No timesheet entries.")
+                : new List(listItems));
     }
 }
 

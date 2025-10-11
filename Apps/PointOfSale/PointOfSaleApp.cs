@@ -36,27 +36,31 @@ public class POSRootBlade : ViewBase
             }
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
-                .Gap(12)
-                .Add($"Cart Total: ${cartTotal.Value:N2}")
-                .Add(Layout.Horizontal()
-                    .Gap(8)
-                    .Add(new Button("Clear Cart", _ => {
-                        cartTotal.Set(0);
-                        client.Toast("Cart cleared");
-                    })
-                        .Variant(ButtonVariant.Secondary))
-                    .Add(new Button("Checkout", _ => {
-                        client.Toast($"Processing ${cartTotal.Value:N2}");
-                        cartTotal.Set(0);
-                    })
-                        .Variant(ButtonVariant.Success)
-                        .Icon(Icons.Check))
-                    .Add(new Button("History", _ => blades.Push(this, new SalesHistoryBlade(), "History"))
-                        .Variant(ButtonVariant.Outline))),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Point of Sale"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(12)
+                    .Padding(16)
+                    .Add($"Cart Total: ${cartTotal.Value:N2}")
+                    .Add(Layout.Horizontal()
+                        .Gap(8)
+                        .Add(new Button("Clear Cart", _ => {
+                            cartTotal.Set(0);
+                            client.Toast("Cart cleared");
+                        })
+                            .Variant(ButtonVariant.Secondary))
+                        .Add(new Button("Checkout", _ => {
+                            client.Toast($"Processing ${cartTotal.Value:N2}");
+                            cartTotal.Set(0);
+                        })
+                            .Variant(ButtonVariant.Success)
+                            .Icon(Icons.Check))
+                        .Add(new Button("History", _ => blades.Push(this, new SalesHistoryBlade(), "History"))
+                            .Variant(ButtonVariant.Outline)))))
+            .Add(new List(listItems));
     }
 }
 

@@ -30,14 +30,18 @@ public class EmailMarketingRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new CampaignDetailBlade(camp.Id), camp.Name); return default; }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Campaign", _ => client.Toast("Create campaign"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            campaigns.Count == 0 
-                ? "No campaigns yet."
-                : new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Email Campaigns"))
+                .Add(new Button("New Campaign", _ => client.Toast("Create campaign"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(campaigns.Count == 0 
+                ? Text.Block("No campaigns yet.")
+                : new List(listItems));
     }
 }
 

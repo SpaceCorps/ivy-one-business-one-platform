@@ -31,12 +31,16 @@ public class PlanningRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new EventDetailBlade(evt.Title, evt.Time, evt.Duration, evt.Type), evt.Title); }
         ));
         
-        return BladeHelper.WithHeader(
-            new Button("New Event", _ => client.Toast("Create event"))
-                .Icon(Icons.Plus)
-                .Variant(ButtonVariant.Primary),
-            new List(listItems)
-        );
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(Text.H3("Upcoming Events"))
+                .Add(new Button("New Event", _ => client.Toast("Create event"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
+            .Add(new List(listItems));
     }
 }
 

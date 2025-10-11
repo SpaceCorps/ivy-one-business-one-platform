@@ -32,22 +32,24 @@ public class SubscriptionsRootBlade : ViewBase
             onClick: _ => blades.Push(this, new SubscriptionDetailBlade(sub.Id), sub.CustomerName)
         ));
         
-        return BladeHelper.WithHeader(
-            Layout.Vertical()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3("Subscriptions"))
+            .Add(Layout.Grid()
+                .Columns(3)
                 .Gap(12)
-                .Add(Layout.Grid()
-                    .Columns(3)
-                    .Gap(12)
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Active").Add(activeCount.ToString())))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Monthly Revenue").Add($"${monthlyRevenue:N2}")))
-                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(subscriptions.Count.ToString()))))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Active").Add(activeCount.ToString())))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Monthly Revenue").Add($"${monthlyRevenue:N2}")))
+                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Total").Add(subscriptions.Count.ToString()))))
+            .Add(Layout.Horizontal()
+                .Gap(12)
                 .Add(new Button("New Subscription", _ => client.Toast("Create subscription"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
-            subscriptions.Count == 0 
-                ? "No subscriptions found."
-                : new List(listItems)
-        );
+                    .Variant(ButtonVariant.Primary)))
+            .Add(subscriptions.Count == 0 
+                ? Text.Block("No subscriptions found.")
+                : new List(listItems));
     }
 }
 
