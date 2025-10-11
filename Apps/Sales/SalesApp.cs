@@ -216,7 +216,7 @@ public class OpportunityCreateDialog(IState<bool> isOpen, RefreshToken refreshTo
 
     private int CreateOpportunity(ApplicationDbContext db, OpportunityCreateRequest request)
     {
-        var id = db.Opportunities.Max(o => o.Id) + 1;
+        var id = (db.Opportunities.Max(o => (int?)o.Id) ?? 0) + 1;
 
         db.Opportunities.Add(new Opportunity()
         {
