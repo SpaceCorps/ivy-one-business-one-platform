@@ -73,9 +73,9 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         
-        var order = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+        var initialOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
         
-        if (order == null)
+        if (initialOrder == null)
         {
             return Layout.Vertical()
                 .Gap(4)
@@ -84,45 +84,24 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
                     .Variant(ButtonVariant.Secondary));
         }
         
-        var currentStatus = this.UseState(order.Status);
+        var orderData = this.UseState(initialOrder);
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        var orderData = this.UseState(order);
         
-        this.UseEffect(() =>
-        {
-            // Update database when status changes
-            var dbOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
-            if (dbOrder != null && dbOrder.Status != currentStatus.Value)
-            {
-                dbOrder.Status = currentStatus.Value;
-                dbOrder.UpdatedAt = DateTime.UtcNow;
-                context.SaveChanges();
-                refreshToken.Refresh();
-                onRefresh?.Invoke();
-            }
-        }, [currentStatus.ToTrigger()]);
-
         // Refresh order data when refresh token changes
         this.UseEffect(() =>
         {
-            if (refreshToken.ReturnValue != null)
+            var updatedOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+            if (updatedOrder != null)
             {
-                // Reload order data from database
-                var updatedOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
-                if (updatedOrder != null)
-                {
-                    // Update all local state with fresh data
-                    orderData.Set(updatedOrder);
-                    currentStatus.Set(updatedOrder.Status);
-                }
+                orderData.Set(updatedOrder);
             }
         }, [refreshToken.ToTrigger()]);
         
-        var statusBadge = new Badge(currentStatus.Value.ToString())
-            .Variant(currentStatus.Value == PurchaseOrderStatus.Received ? BadgeVariant.Success :
-                   currentStatus.Value == PurchaseOrderStatus.Approved ? BadgeVariant.Primary :
-                   currentStatus.Value == PurchaseOrderStatus.Cancelled ? BadgeVariant.Destructive :
+        var statusBadge = new Badge(orderData.Value.Status.ToString())
+            .Variant(orderData.Value.Status == PurchaseOrderStatus.Received ? BadgeVariant.Success :
+                   orderData.Value.Status == PurchaseOrderStatus.Approved ? BadgeVariant.Primary :
+                   orderData.Value.Status == PurchaseOrderStatus.Cancelled ? BadgeVariant.Destructive :
                    BadgeVariant.Secondary);
 
         var orderDetails = new
@@ -144,18 +123,34 @@ public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : V
             .Add(orderDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Notes))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(currentStatus.Value == PurchaseOrderStatus.Pending 
+                .Add(orderData.Value.Status == PurchaseOrderStatus.Pending 
                     ? new Button("Approve Order", _ => {
-                        currentStatus.Set(PurchaseOrderStatus.Approved);
-                        client.Toast($"Purchase Order {orderData.Value.OrderNumber} approved!");
+                        var dbOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+                        if (dbOrder != null)
+                        {
+                            dbOrder.Status = PurchaseOrderStatus.Approved;
+                            dbOrder.UpdatedAt = DateTime.UtcNow;
+                            context.SaveChanges();
+                            client.Toast($"Purchase Order {orderData.Value.OrderNumber} approved!");
+                            refreshToken.Refresh();
+                            onRefresh?.Invoke();
+                        }
                     })
                         .Variant(ButtonVariant.Success)
                         .Icon(Icons.Check)
                     : null)
-                .Add(currentStatus.Value == PurchaseOrderStatus.Approved 
+                .Add(orderData.Value.Status == PurchaseOrderStatus.Approved 
                     ? new Button("Mark as Received", _ => {
-                        currentStatus.Set(PurchaseOrderStatus.Received);
-                        client.Toast($"Purchase Order {orderData.Value.OrderNumber} marked as received!");
+                        var dbOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+                        if (dbOrder != null)
+                        {
+                            dbOrder.Status = PurchaseOrderStatus.Received;
+                            dbOrder.UpdatedAt = DateTime.UtcNow;
+                            context.SaveChanges();
+                            client.Toast($"Purchase Order {orderData.Value.OrderNumber} marked as received!");
+                            refreshToken.Refresh();
+                            onRefresh?.Invoke();
+                        }
                     })
                         .Variant(ButtonVariant.Primary)
                         .Icon(Icons.Package)
@@ -211,15 +206,18 @@ public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null)
         var isEdit = orderId.HasValue;
         var existingOrder = isEdit ? context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId!.Value) : null;
         
-        var orderNumber = this.UseState(existingOrder?.OrderNumber ?? $"PO-{DateTime.Now:yyyyMMdd-HHmmss}");
-        var supplier = this.UseState(existingOrder?.Supplier ?? "");
-        var amount = this.UseState(existingOrder?.Amount.ToString() ?? "0.00");
-        var status = this.UseState(existingOrder?.Status ?? PurchaseOrderStatus.Pending);
-        var orderDate = this.UseState(existingOrder?.OrderDate ?? DateTime.UtcNow);
-        var expectedDelivery = this.UseState(existingOrder?.ExpectedDeliveryDate ?? DateTime.UtcNow.AddDays(30));
-        var paymentTerms = this.UseState(existingOrder?.PaymentTerms ?? "Net 30");
-        var department = this.UseState(existingOrder?.Department ?? "Operations");
-        var notes = this.UseState(existingOrder?.Notes ?? "");
+        var orderForm = this.UseState(existingOrder ?? new PurchaseOrder
+        {
+            OrderNumber = $"PO-{DateTime.Now:yyyyMMdd-HHmmss}",
+            Supplier = "",
+            Amount = 0.00m,
+            Status = PurchaseOrderStatus.Pending,
+            OrderDate = DateTime.UtcNow,
+            ExpectedDeliveryDate = DateTime.UtcNow.AddDays(30),
+            PaymentTerms = "Net 30",
+            Department = "Operations",
+            Notes = ""
+        });
         
         var statusOptions = new[]
         {
@@ -244,15 +242,15 @@ public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null)
                             if (isEdit && existingOrder != null)
                             {
                                 // Update existing order
-                                existingOrder.OrderNumber = orderNumber.Value;
-                                existingOrder.Supplier = supplier.Value;
-                                existingOrder.Amount = decimal.Parse(amount.Value);
-                                existingOrder.Status = status.Value;
-                                existingOrder.OrderDate = orderDate.Value;
-                                existingOrder.ExpectedDeliveryDate = expectedDelivery.Value;
-                                existingOrder.PaymentTerms = paymentTerms.Value;
-                                existingOrder.Department = department.Value;
-                                existingOrder.Notes = notes.Value;
+                                existingOrder.OrderNumber = orderForm.Value.OrderNumber;
+                                existingOrder.Supplier = orderForm.Value.Supplier;
+                                existingOrder.Amount = orderForm.Value.Amount;
+                                existingOrder.Status = orderForm.Value.Status;
+                                existingOrder.OrderDate = orderForm.Value.OrderDate;
+                                existingOrder.ExpectedDeliveryDate = orderForm.Value.ExpectedDeliveryDate;
+                                existingOrder.PaymentTerms = orderForm.Value.PaymentTerms;
+                                existingOrder.Department = orderForm.Value.Department;
+                                existingOrder.Notes = orderForm.Value.Notes;
                                 existingOrder.UpdatedAt = DateTime.UtcNow;
                             }
                             else
@@ -260,15 +258,15 @@ public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null)
                                 // Create new order
                                 var newOrder = new PurchaseOrder
                                 {
-                                    OrderNumber = orderNumber.Value,
-                                    Supplier = supplier.Value,
-                                    Amount = decimal.Parse(amount.Value),
-                                    Status = status.Value,
-                                    OrderDate = orderDate.Value,
-                                    ExpectedDeliveryDate = expectedDelivery.Value,
-                                    PaymentTerms = paymentTerms.Value,
-                                    Department = department.Value,
-                                    Notes = notes.Value,
+                                    OrderNumber = orderForm.Value.OrderNumber,
+                                    Supplier = orderForm.Value.Supplier,
+                                    Amount = orderForm.Value.Amount,
+                                    Status = orderForm.Value.Status,
+                                    OrderDate = orderForm.Value.OrderDate,
+                                    ExpectedDeliveryDate = orderForm.Value.ExpectedDeliveryDate,
+                                    PaymentTerms = orderForm.Value.PaymentTerms,
+                                    Department = orderForm.Value.Department,
+                                    Notes = orderForm.Value.Notes,
                                     CreatedAt = DateTime.UtcNow,
                                     UpdatedAt = DateTime.UtcNow
                                 };
@@ -293,33 +291,69 @@ public class PurchaseOrderFormSheet(int? orderId = null, Action? onClose = null)
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Basic Information"))
                         .Add(Text.Small("Order Number"))
-                        .Add(orderNumber.ToTextInput().Placeholder("Order Number"))
+                        .Add(new TextInput(orderForm.Value.OrderNumber, e => {
+                            var updated = orderForm.Value;
+                            updated.OrderNumber = e.Value;
+                            orderForm.Set(updated);
+                        }).Placeholder("Order Number"))
                         .Add(Text.Small("Supplier"))
-                        .Add(supplier.ToTextInput().Placeholder("Supplier Name"))
+                        .Add(new TextInput(orderForm.Value.Supplier, e => {
+                            var updated = orderForm.Value;
+                            updated.Supplier = e.Value;
+                            orderForm.Set(updated);
+                        }).Placeholder("Supplier Name"))
                         .Add(Text.Small("Amount ($)"))
-                        .Add(amount.ToTextInput().Placeholder("0.00"))
+                        .Add(new NumberInput<decimal>(orderForm.Value.Amount, v => {
+                            var updated = orderForm.Value;
+                            updated.Amount = v;
+                            orderForm.Set(updated);
+                        }).Placeholder("0.00"))
                         .Add(Text.Small("Status"))
-                        .Add(status.ToSelectInput(statusOptions.ToOptions()))
+                        .Add(new SelectInput<PurchaseOrderStatus>(orderForm.Value.Status, e => {
+                            var updated = orderForm.Value;
+                            updated.Status = e.Value;
+                            orderForm.Set(updated);
+                        }, statusOptions.ToOptions()))
                         .Add(Text.Small("Department"))
-                        .Add(department.ToSelectInput(departmentOptions.ToOptions()))
+                        .Add(new SelectInput<string>(orderForm.Value.Department, e => {
+                            var updated = orderForm.Value;
+                            updated.Department = e.Value;
+                            orderForm.Set(updated);
+                        }, departmentOptions.ToOptions()))
                 ).Title("Order Details"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Dates & Terms"))
                         .Add(Text.Small("Order Date"))
-                        .Add(orderDate.ToDateTimeInput())
+                        .Add(new DateTimeInput<DateTime>(orderForm.Value.OrderDate, e => {
+                            var updated = orderForm.Value;
+                            updated.OrderDate = e.Value;
+                            orderForm.Set(updated);
+                        }))
                         .Add(Text.Small("Expected Delivery"))
-                        .Add(expectedDelivery.ToDateTimeInput())
+                        .Add(new DateTimeInput<DateTime>(orderForm.Value.ExpectedDeliveryDate ?? DateTime.UtcNow, e => {
+                            var updated = orderForm.Value;
+                            updated.ExpectedDeliveryDate = e.Value;
+                            orderForm.Set(updated);
+                        }))
                         .Add(Text.Small("Payment Terms"))
-                        .Add(paymentTerms.ToTextInput().Placeholder("Net 30"))
+                        .Add(new TextInput(orderForm.Value.PaymentTerms, e => {
+                            var updated = orderForm.Value;
+                            updated.PaymentTerms = e.Value;
+                            orderForm.Set(updated);
+                        }).Placeholder("Net 30"))
                 ).Title("Timeline"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
-                        .Add(notes.ToTextInput().Placeholder("Additional notes...").Variant(TextInputs.Textarea))
+                        .Add(new TextInput(orderForm.Value.Notes, e => {
+                            var updated = orderForm.Value;
+                            updated.Notes = e.Value;
+                            orderForm.Set(updated);
+                        }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                 ).Title("Notes"))
         );
     }
