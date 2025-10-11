@@ -28,10 +28,9 @@ public class PurchaseRootBlade : ViewBase
         ));
         
         return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
+            .Gap(4)
             .Add(Layout.Horizontal()
-                .Gap(12)
+                .Gap(4)
                 .Add(Text.H3("Purchase Orders"))
                 .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
                     .Icon(Icons.Plus)
@@ -55,8 +54,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
         if (order == null)
         {
             return Layout.Vertical()
-                .Gap(16)
-                .Padding(24)
+                .Gap(4)
                 .Add(Text.H3("Purchase Order Not Found"))
                 .Add(new Button("Go Back", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary));
@@ -76,42 +74,31 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
             }
         }, [currentStatus.ToTrigger()]);
         
+        var statusBadge = new Badge(currentStatus.Value.ToString())
+            .Variant(currentStatus.Value == PurchaseOrderStatus.Received ? BadgeVariant.Success :
+                   currentStatus.Value == PurchaseOrderStatus.Approved ? BadgeVariant.Primary :
+                   currentStatus.Value == PurchaseOrderStatus.Cancelled ? BadgeVariant.Destructive :
+                   BadgeVariant.Secondary);
+
+        var orderDetails = new
+        {
+            OrderNumber = order.OrderNumber,
+            Supplier = order.Supplier,
+            Amount = $"${order.Amount:N2}",
+            Status = statusBadge,
+            OrderDate = order.OrderDate.ToString("MMM dd, yyyy"),
+            ExpectedDelivery = order.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "Not set",
+            PaymentTerms = order.PaymentTerms,
+            Department = order.Department,
+            Notes = order.Notes
+        };
+        
         return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
+            .Gap(4)
             .Add(Text.H3($"Purchase Order {order.OrderNumber}"))
-            .Add(new Card(
-                Layout.Vertical()
-                    .Gap(12)
-                    .Padding(16)
-                    .Add(Layout.Vertical()
-                        .Gap(8)
-                        .Add(Text.Label("Supplier"))
-                        .Add(Text.Block(order.Supplier)))
-                    .Add(Layout.Vertical()
-                        .Gap(8)
-                        .Add(Text.Label("Amount"))
-                        .Add(Text.Block($"${order.Amount:N2}")))
-                    .Add(Layout.Vertical()
-                        .Gap(8)
-                        .Add(Text.Label("Status"))
-                        .Add(new Badge(currentStatus.Value.ToString())
-                            .Variant(currentStatus.Value == PurchaseOrderStatus.Received ? BadgeVariant.Success :
-                                   currentStatus.Value == PurchaseOrderStatus.Approved ? BadgeVariant.Primary :
-                                   currentStatus.Value == PurchaseOrderStatus.Cancelled ? BadgeVariant.Destructive :
-                                   BadgeVariant.Secondary)))))
-            .Add(new Card(
-                Layout.Vertical()
-                    .Gap(12)
-                    .Padding(16)
-                    .Add(Text.Label("Order Details"))
-                    .Add($"Order Date: {order.OrderDate:MMM dd, yyyy}")
-                    .Add($"Expected Delivery: {order.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "Not set"}")
-                    .Add($"Payment Terms: {order.PaymentTerms}")
-                    .Add($"Department: {order.Department}")
-                    .Add(string.IsNullOrEmpty(order.Notes) ? null : $"Notes: {order.Notes}")))
+            .Add(orderDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Notes))
             .Add(Layout.Horizontal()
-                .Gap(12)
+                .Gap(4)
                 .Add(currentStatus.Value == PurchaseOrderStatus.Pending 
                     ? new Button("Approve Order", _ => {
                         currentStatus.Set(PurchaseOrderStatus.Approved);
