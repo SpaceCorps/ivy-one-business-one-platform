@@ -51,6 +51,9 @@ public class ApplicationDbContext : DbContext
 
     // Manufacturing
     public DbSet<WorkOrder> WorkOrders { get; set; }
+    
+    // Purchase orders
+    public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
