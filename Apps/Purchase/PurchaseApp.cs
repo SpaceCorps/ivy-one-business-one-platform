@@ -38,18 +38,17 @@ public class PurchaseRootBlade : ViewBase
             onClick: _ => blades.Push(this, new PurchaseOrderDetailBlade(order.Id), order.OrderNumber)
         ));
         
-        return Layout.Vertical()
-            .Gap(4)
-            .Add(Layout.Horizontal()
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
                 .Gap(4)
-                .Add(Text.H3("Purchase Orders"))
+                .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
                 .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)))
-            .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
-            .Add(orders.Count == 0 
+                    .Variant(ButtonVariant.Primary)),
+            orders.Count == 0 
                 ? Text.Block("No purchase orders found. Try a different search or create your first order!")
-                : new List(listItems));
+                : new List(listItems)
+        );
     }
 }
 
