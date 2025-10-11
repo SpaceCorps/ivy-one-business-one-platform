@@ -663,12 +663,34 @@ public class InvoiceDetailBlade : ViewBase
     {
         var db = this.UseService<ApplicationDbContext>();
         var client = this.UseService<IClientProvider>();
+        var blades = this.UseContext<IBladeController>();
 
         var invoice = db.Invoices.FirstOrDefault(i => i.Id == _invoiceId);
         if (invoice == null)
         {
             return new Card("Invoice not found");
         }
+
+        var onDelete = new Action<Event<Button>>(_ =>
+        {
+            try
+            {
+                var invoiceToDelete = db.Invoices.FirstOrDefault(i => i.Id == _invoiceId);
+                if (invoiceToDelete != null)
+                {
+                    var invoiceNumber = invoiceToDelete.InvoiceNumber;
+                    db.Invoices.Remove(invoiceToDelete);
+                    db.SaveChanges();
+                    
+                    client.Toast($"Invoice {invoiceNumber} deleted successfully!");
+                    blades.Pop(this, true); // Pop this blade and refresh the previous one
+                }
+            }
+            catch (Exception ex)
+            {
+                client.Toast($"Error deleting invoice: {ex.Message}");
+            }
+        });
 
         return Layout.Vertical()
             .Gap(3)
@@ -680,7 +702,7 @@ public class InvoiceDetailBlade : ViewBase
                     description: $"Editing invoice #{invoice.InvoiceNumber}",
                     width: Size.Fraction(1 / 2f)
                 ))
-                .Add(new Button("Delete").Icon(Icons.Trash).Variant(ButtonVariant.Destructive)))
+                .Add(new Button("Delete").Icon(Icons.Trash).Variant(ButtonVariant.Destructive).HandleClick(onDelete)))
             .Add(new Card(
                 Layout.Vertical()
                     .Gap(2)
