@@ -5,7 +5,7 @@ public class ManufacturingApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new ManufacturingRootBlade(), "Manufacturing");
+        return this.UseBlades(() => new ManufacturingRootBlade(), "Manufacturing", Size.Units(80));
     }
 }
 

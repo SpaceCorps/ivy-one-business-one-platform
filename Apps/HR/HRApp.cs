@@ -8,7 +8,7 @@ public class HRApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new HRRootBlade(), "HR");
+        return this.UseBlades(() => new HRRootBlade(), "HR", Size.Units(80));
     }
 }
 

@@ -5,7 +5,7 @@ public class SocialMarketingApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new SocialMarketingRootBlade(), "Social Marketing");
+        return this.UseBlades(() => new SocialMarketingRootBlade(), "Social Marketing", Size.Units(80));
     }
 }
 

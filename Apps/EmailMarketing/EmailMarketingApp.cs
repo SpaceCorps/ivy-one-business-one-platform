@@ -8,7 +8,7 @@ public class EmailMarketingApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new EmailMarketingRootBlade(), "Email Marketing");
+        return this.UseBlades(() => new EmailMarketingRootBlade(), "Email Marketing", Size.Units(80));
     }
 }
 

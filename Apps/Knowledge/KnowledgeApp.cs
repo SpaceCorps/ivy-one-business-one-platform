@@ -8,7 +8,7 @@ public class KnowledgeApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new KnowledgeRootBlade(), "Knowledge Base");
+        return this.UseBlades(() => new KnowledgeRootBlade(), "Knowledge Base", Size.Units(80));
     }
 }
 

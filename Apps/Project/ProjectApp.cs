@@ -8,7 +8,7 @@ public class ProjectApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new ProjectRootBlade(), "Projects");
+        return this.UseBlades(() => new ProjectRootBlade(), "Projects", Size.Units(80));
     }
 }
 

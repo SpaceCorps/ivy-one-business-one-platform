@@ -8,7 +8,7 @@ public class CRMApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new CRMRootBlade(), "CRM");
+        return this.UseBlades(() => new CRMRootBlade(), "CRM", Size.Units(80));
     }
 }
 

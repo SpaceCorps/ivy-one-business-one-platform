@@ -5,7 +5,7 @@ public class StudioApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new StudioRootBlade(), "Studio");
+        return this.UseBlades(() => new StudioRootBlade(), "Studio", Size.Units(80));
     }
 }
 

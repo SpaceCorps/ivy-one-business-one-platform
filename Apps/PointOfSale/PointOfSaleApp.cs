@@ -5,7 +5,7 @@ public class PointOfSaleApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new POSRootBlade(), "Point of Sale");
+        return this.UseBlades(() => new POSRootBlade(), "Point of Sale", Size.Units(80));
     }
 }
 

@@ -8,7 +8,7 @@ public class SubscriptionsApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new SubscriptionsRootBlade(), "Subscriptions");
+        return this.UseBlades(() => new SubscriptionsRootBlade(), "Subscriptions", Size.Units(80));
     }
 }
 
