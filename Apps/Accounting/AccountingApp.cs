@@ -8,7 +8,7 @@ public class AccountingApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new AccountingRootBlade(), "Accounting", Size.Units(80));
+        return this.UseBlades(() => new AccountingRootBlade(), "Accounting", Size.Units(110));
     }
 }
 
