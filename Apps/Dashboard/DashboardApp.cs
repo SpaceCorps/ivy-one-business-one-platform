@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Dashboard;
 
-[App(icon: Icons.Grid3x3, title: "Dashboard")]
+[App(icon: Icons.Grid3x3, title: "Dashboard", path: new[] { "Dashboard" })]
 public class DashboardApp : ViewBase
 {
     public override object? Build()

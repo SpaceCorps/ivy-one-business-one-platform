@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Rental;
 
-[App(icon: Icons.Key, title: "Rental")]
+[App(icon: Icons.Key, title: "Rental", path: new[] { "Commerce & Services" })]
 public class RentalApp : ViewBase
 {
     public override object? Build()

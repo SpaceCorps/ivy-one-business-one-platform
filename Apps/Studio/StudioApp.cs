@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Studio;
 
-[App(icon: Icons.Wrench, title: "Studio")]
+[App(icon: Icons.Wrench, title: "Studio", path: new[] { "Development & Content" })]
 public class StudioApp : ViewBase
 {
     public override object? Build()

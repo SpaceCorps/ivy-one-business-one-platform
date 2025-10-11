@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Website;
 
-[App(icon: Icons.Globe, title: "Website")]
+[App(icon: Icons.Globe, title: "Website", path: new[] { "Marketing & Communication" })]
 public class WebsiteApp : ViewBase
 {
     public override object? Build()

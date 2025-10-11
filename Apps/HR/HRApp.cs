@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.HR;
 
-[App(icon: Icons.User, title: "HR")]
+[App(icon: Icons.User, title: "HR", path: new[] { "Human Resources" })]
 public class HRApp : ViewBase
 {
     public override object? Build()

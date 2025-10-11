@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.SocialMarketing;
 
-[App(icon: Icons.Heart, title: "Social Marketing")]
+[App(icon: Icons.Heart, title: "Social Marketing", path: new[] { "Marketing & Communication" })]
 public class SocialMarketingApp : ViewBase
 {
     public override object? Build()

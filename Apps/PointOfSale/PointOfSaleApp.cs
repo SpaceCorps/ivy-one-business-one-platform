@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.PointOfSale;
 
-[App(icon: Icons.ShoppingCart, title: "Point of Sale")]
+[App(icon: Icons.ShoppingCart, title: "Point of Sale", path: new[] { "Commerce & Services" })]
 public class PointOfSaleApp : ViewBase
 {
     public override object? Build()

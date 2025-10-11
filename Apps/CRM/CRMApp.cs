@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.CRM;
 
-[App(icon: Icons.Users, title: "CRM")]
+[App(icon: Icons.Users, title: "CRM", path: new[] { "Business Operations" })]
 public class CRMApp : ViewBase
 {
     public override object? Build()

@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Documents;
 
-[App(icon: Icons.FileText, title: "Documents")]
+[App(icon: Icons.FileText, title: "Documents", path: new[] { "Development & Content" })]
 public class DocumentsApp : ViewBase
 {
     public override object? Build()

@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Sign;
 
-[App(icon: Icons.Signature, title: "Sign")]
+[App(icon: Icons.Signature, title: "Sign", path: new[] { "Customer Service" })]
 public class SignApp : ViewBase
 {
     public override object? Build()

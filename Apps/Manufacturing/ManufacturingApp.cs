@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Manufacturing;
 
-[App(icon: Icons.Settings, title: "Manufacturing")]
+[App(icon: Icons.Settings, title: "Manufacturing", path: new[] { "Business Operations" })]
 public class ManufacturingApp : ViewBase
 {
     public override object? Build()

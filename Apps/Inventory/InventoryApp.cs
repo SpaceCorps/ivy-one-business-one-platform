@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Inventory;
 
-[App(icon: Icons.Box, title: "Inventory")]
+[App(icon: Icons.Box, title: "Inventory", path: new[] { "Business Operations" })]
 public class InventoryApp : ViewBase
 {
     public override object? Build()

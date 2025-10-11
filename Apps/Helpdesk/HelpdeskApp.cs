@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Helpdesk;
 
-[App(icon: Icons.Info, title: "Helpdesk")]
+[App(icon: Icons.Info, title: "Helpdesk", path: new[] { "Customer Service" })]
 public class HelpdeskApp : ViewBase
 {
     public override object? Build()

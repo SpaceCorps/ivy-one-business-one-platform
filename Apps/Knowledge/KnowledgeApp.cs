@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Knowledge;
 
-[App(icon: Icons.Bookmark, title: "Knowledge")]
+[App(icon: Icons.Bookmark, title: "Knowledge", path: new[] { "Customer Service" })]
 public class KnowledgeApp : ViewBase
 {
     public override object? Build()

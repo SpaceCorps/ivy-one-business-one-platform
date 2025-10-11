@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Subscriptions;
 
-[App(icon: Icons.RefreshCw, title: "Subscriptions")]
+[App(icon: Icons.RefreshCw, title: "Subscriptions", path: new[] { "Commerce & Services" })]
 public class SubscriptionsApp : ViewBase
 {
     public override object? Build()

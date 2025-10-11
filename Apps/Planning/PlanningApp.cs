@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Planning;
 
-[App(icon: Icons.Calendar, title: "Planning")]
+[App(icon: Icons.Calendar, title: "Planning", path: new[] { "Project & Time Management" })]
 public class PlanningApp : ViewBase
 {
     public override object? Build()

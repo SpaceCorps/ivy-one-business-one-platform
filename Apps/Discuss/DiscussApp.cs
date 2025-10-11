@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Discuss;
 
-[App(icon: Icons.MessageCircle, title: "Discuss")]
+[App(icon: Icons.MessageCircle, title: "Discuss", path: new[] { "Customer Service" })]
 public class DiscussApp : ViewBase
 {
     public override object? Build()

@@ -1,6 +1,6 @@
 ﻿namespace IvyOneBusinessOnePlatform.Apps;
 
-[App(icon: Icons.PartyPopper, title: "Main Dashboard")]
+[App(icon: Icons.PartyPopper, title: "Main Dashboard", path: new[] { "Dashboard" })]
 public class MainDashboardApp : ViewBase
 {
     private readonly AppInfo[] AppList =

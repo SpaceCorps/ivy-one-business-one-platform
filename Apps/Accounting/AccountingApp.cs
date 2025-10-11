@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Accounting;
 
-[App(icon: Icons.Percent, title: "Accounting")]
+[App(icon: Icons.Percent, title: "Accounting", path: new[] { "Business Operations" })]
 public class AccountingApp : ViewBase
 {
     public override object? Build()

@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Sales;
 
-[App(icon: Icons.TrendingUp, title: "Sales")]
+[App(icon: Icons.TrendingUp, title: "Sales", path: new[] { "Business Operations" })]
 public class SalesApp : ViewBase
 {
     public override object? Build()

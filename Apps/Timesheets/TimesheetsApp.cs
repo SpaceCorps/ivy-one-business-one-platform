@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Timesheets;
 
-[App(icon: Icons.Clock, title: "Timesheets")]
+[App(icon: Icons.Clock, title: "Timesheets", path: new[] { "Project & Time Management" })]
 public class TimesheetsApp : ViewBase
 {
     public override object? Build()

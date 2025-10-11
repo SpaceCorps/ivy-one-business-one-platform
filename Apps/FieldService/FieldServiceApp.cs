@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.FieldService;
 
-[App(icon: Icons.Zap, title: "Field Service")]
+[App(icon: Icons.Zap, title: "Field Service", path: new[] { "Project & Time Management" })]
 public class FieldServiceApp : ViewBase
 {
     public override object? Build()

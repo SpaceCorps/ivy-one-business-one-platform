@@ -1,6 +1,6 @@
 namespace IvyOneBusinessOnePlatform.Apps.Purchase;
 
-[App(icon: Icons.ShoppingBag, title: "Purchase")]
+[App(icon: Icons.ShoppingBag, title: "Purchase", path: new[] { "Business Operations" })]
 public class PurchaseApp : ViewBase
 {
     public override object? Build()
