@@ -15,7 +15,7 @@ public class AccountingApp : ViewBase
     public override object? Build()
     {
         var seeded = this.UseState(false);
-        
+
         // Seed mock data if needed
         this.UseEffect(() =>
         {
@@ -30,10 +30,10 @@ public class AccountingApp : ViewBase
                 });
             }
         }, []);
-        
+
         return this.UseBlades(() => new AccountingMenuBlade(), "Accounting");
     }
-    
+
     private static async System.Threading.Tasks.Task SeedAccountingDataAsync()
     {
         try
@@ -42,16 +42,16 @@ public class AccountingApp : ViewBase
             var connectionString = "Data Source=business_platform.db";
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
             optionsBuilder.UseSqlite(connectionString);
-            
+
             using var db = new ApplicationDbContext(optionsBuilder.Options);
-            
+
             // Only seed if no invoices exist
             if (await db.Invoices.AnyAsync())
                 return;
-            
-        // Seed invoices
-        var invoices = new[]
-        {
+
+            // Seed invoices
+            var invoices = new[]
+            {
             new Invoice
             {
                 InvoiceNumber = "INV-2024-001",
@@ -157,13 +157,13 @@ public class AccountingApp : ViewBase
                 Description = "Cloud migration services"
             }
         };
-        
-        db.Invoices.AddRange(invoices);
-        await db.SaveChangesAsync();
-        
-        // Seed payments
-        var payments = new[]
-        {
+
+            db.Invoices.AddRange(invoices);
+            await db.SaveChangesAsync();
+
+            // Seed payments
+            var payments = new[]
+            {
             new Payment
             {
                 InvoiceId = invoices[1].Id,
@@ -192,13 +192,13 @@ public class AccountingApp : ViewBase
                 Notes = "Partial payment - Check #2456"
             }
         };
-        
-        db.Payments.AddRange(payments);
-        await db.SaveChangesAsync();
-        
-        // Seed transactions
-        var transactions = new[]
-        {
+
+            db.Payments.AddRange(payments);
+            await db.SaveChangesAsync();
+
+            // Seed transactions
+            var transactions = new[]
+            {
             new Transaction
             {
                 TransactionNumber = "TXN-2024-001",
@@ -308,9 +308,9 @@ public class AccountingApp : ViewBase
                 Reference = "BANK-FEES-OCT"
             }
         };
-        
-        db.Transactions.AddRange(transactions);
-        await db.SaveChangesAsync();
+
+            db.Transactions.AddRange(transactions);
+            await db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
@@ -409,43 +409,43 @@ public class DashboardBlade : ViewBase
                 .Columns(2)
                 .Gap(3)
                 .Add(new Card(
-                    Layout.Vertical()
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal()
                         .Gap(2)
-                        .Add(Layout.Horizontal()
-                            .Gap(2)
-                            .Add(Icons.TrendingUp.ToIcon())
-                            .Add(Text.Small("TOTAL REVENUE")))
+                        .Add(Icons.TrendingUp.ToIcon())
+                        .Add(Text.Small("TOTAL REVENUE")))
                         .Add(Text.H2($"${totalRevenue:N0}"))
                         .Add(Text.Small("From paid invoices"))))
                 .Add(new Card(
-                    Layout.Vertical()
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal()
                         .Gap(2)
-                        .Add(Layout.Horizontal()
-                            .Gap(2)
-                            .Add(Icons.Clock.ToIcon())
+                        .Add(Icons.Clock.ToIcon())
                             .Add(Text.Small("PENDING")))
                         .Add(Text.H2($"${pendingInvoices:N0}"))
                         .Add(Text.Small("Unpaid invoices"))))
                 .Add(new Card(
-                    Layout.Vertical()
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal()
                         .Gap(2)
-                        .Add(Layout.Horizontal()
-                            .Gap(2)
-                            .Add(Icons.X.ToIcon())
-                            .Add(Text.Small("OVERDUE")))
+                        .Add(Icons.X.ToIcon())
+                        .Add(Text.Small("OVERDUE")))
                         .Add(Text.H2($"${overdueInvoices:N0}"))
                         .Add(Text.Small("Late payments"))))
                 .Add(new Card(
-                    Layout.Vertical()
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal()
                         .Gap(2)
-                        .Add(Layout.Horizontal()
-                            .Gap(2)
-                            .Add(Icons.CreditCard.ToIcon())
+                        .Add(Icons.CreditCard.ToIcon())
                             .Add(Text.Small("EXPENSES")))
                         .Add(Text.H2($"${totalExpenses:N0}"))
                         .Add(Text.Small("Business expenses")))))
             .Add(new Card(
-                invoices.Count > 0 
+                invoices.Count > 0
                     ? new List(invoices.Take(10).Select(inv => new ListItem(
                         title: $"#{inv.InvoiceNumber} - {inv.CustomerName}",
                         subtitle: $"${inv.TotalAmount:N2} - Due: {inv.DueDate:MMM dd, yyyy}",
@@ -480,7 +480,7 @@ public class InvoicesBlade : ViewBase
         }, [refreshToken]);
 
         var invoices = db.Invoices
-            .Where(i => searchQuery.Value == "" || 
+            .Where(i => searchQuery.Value == "" ||
                        i.InvoiceNumber.Contains(searchQuery.Value) ||
                        i.CustomerName.Contains(searchQuery.Value))
             .OrderByDescending(i => i.IssueDate)
@@ -501,15 +501,29 @@ public class InvoicesBlade : ViewBase
             tag: invoice.Id
         ));
 
+        var createButton = new Button(icon: Icons.Plus, variant: ButtonVariant.Outline).WithSheet(
+            () => new CreateInvoiceSheet(refreshToken),
+            title: "Create New Invoice",
+            description: "Fill in the details to create a new invoice",
+            width: Size.Fraction(1 / 2f)
+        );
+
+        var createButtonFull = new Button("Create Invoice")
+            .Icon(Icons.Plus)
+            .Variant(ButtonVariant.Primary)
+            .WithSheet(
+                () => new CreateInvoiceSheet(refreshToken),
+                title: "Create New Invoice",
+                description: "Fill in the details to create a new invoice",
+                width: Size.Fraction(1 / 2f)
+            );
+
         return BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search invoices..."))
-                .Add(new Button(icon: Icons.Plus, onClick: _ =>
-                {
-                    // Show create invoice sheet
-                }, variant: ButtonVariant.Outline)),
-            invoices.Count > 0 
+                .Add(createButton),
+            invoices.Count > 0
                 ? new List(items)
                 : new Card(
                     Layout.Vertical()
@@ -517,8 +531,121 @@ public class InvoicesBlade : ViewBase
                         .Padding(4)
                         .Add(Text.H4("No invoices found"))
                         .Add(Text.P("Create your first invoice to get started"))
-                        .Add(new Button("Create Invoice").Icon(Icons.Plus).Variant(ButtonVariant.Primary)))
+                        .Add(createButtonFull))
         );
+    }
+}
+
+// Create invoice sheet
+public class CreateInvoiceSheet : ViewBase
+{
+    private readonly RefreshToken _refreshToken;
+
+    public CreateInvoiceSheet(RefreshToken refreshToken)
+    {
+        _refreshToken = refreshToken;
+    }
+
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+
+        var customerName = this.UseState("");
+        var customerEmail = this.UseState("");
+        var description = this.UseState("");
+        var amount = this.UseState(0m);
+        var taxAmount = this.UseState(0m);
+        var dueDate = this.UseState(DateTime.UtcNow.AddDays(30));
+
+        var onSave = new Action<Event<Button>>(_ =>
+        {
+            try
+            {
+                // Validate required fields
+                if (string.IsNullOrWhiteSpace(customerName.Value))
+                {
+                    client.Toast("Customer name is required");
+                    return;
+                }
+
+                if (amount.Value <= 0)
+                {
+                    client.Toast("Amount must be greater than zero");
+                    return;
+                }
+
+                // Generate invoice number
+                var lastInvoice = db.Invoices
+                    .OrderByDescending(i => i.Id)
+                    .FirstOrDefault();
+                
+                var invoiceNumber = lastInvoice != null 
+                    ? $"INV-2024-{(int.Parse(lastInvoice.InvoiceNumber.Split('-')[2]) + 1):D3}"
+                    : "INV-2024-001";
+
+                var totalAmount = amount.Value + taxAmount.Value;
+
+                var invoice = new Invoice
+                {
+                    InvoiceNumber = invoiceNumber,
+                    IssueDate = DateTime.UtcNow,
+                    DueDate = dueDate.Value,
+                    Amount = amount.Value,
+                    TaxAmount = taxAmount.Value,
+                    TotalAmount = totalAmount,
+                    Status = "Draft",
+                    CustomerName = customerName.Value,
+                    CustomerEmail = customerEmail.Value,
+                    Description = description.Value
+                };
+
+                db.Invoices.Add(invoice);
+                db.SaveChanges();
+
+                _refreshToken.Refresh(invoice.Id);
+                client.Toast($"Invoice {invoiceNumber} created successfully!");
+            }
+            catch (Exception ex)
+            {
+                client.Toast($"Error creating invoice: {ex.Message}");
+            }
+        });
+
+        return Layout.Vertical()
+            .Gap(3)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Text.Small("Customer Name *"))
+                    .Add(customerName.ToTextInput().Placeholder("Enter customer name"))
+                    .Add(Text.Small("Customer Email"))
+                    .Add(customerEmail.ToTextInput().Placeholder("customer@example.com"))
+                    .Add(Text.Small("Description"))
+                    .Add(description.ToTextInput().Placeholder("Services provided..."))
+            ).Title("Customer Information"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Text.Small("Amount *"))
+                    .Add(amount.ToNumberInput().Placeholder("0.00"))
+                    .Add(Text.Small("Tax Amount"))
+                    .Add(taxAmount.ToNumberInput().Placeholder("0.00"))
+                    .Add(Text.Small("Total"))
+                    .Add(Text.H3($"${amount.Value + taxAmount.Value:N2}"))
+            ).Title("Amounts"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Text.Small("Due Date"))
+                    .Add(dueDate.ToDateInput())
+            ).Title("Payment Terms"))
+            .Add(Layout.Horizontal()
+                .Gap(2)
+                .Add(new Button("Create Invoice")
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(onSave)
+                    .Width(Size.Full())));
     }
 }
 
@@ -536,7 +663,7 @@ public class InvoiceDetailBlade : ViewBase
     {
         var db = this.UseService<ApplicationDbContext>();
         var client = this.UseService<IClientProvider>();
-        
+
         var invoice = db.Invoices.FirstOrDefault(i => i.Id == _invoiceId);
         if (invoice == null)
         {
@@ -545,13 +672,13 @@ public class InvoiceDetailBlade : ViewBase
 
         return Layout.Vertical()
             .Gap(3)
-            .Add(Layout.Horizontal()
-                .Gap(2)
+                    .Add(Layout.Horizontal()
+                        .Gap(2)
                 .Add(new Button("Edit").Icon(Icons.Pencil).Variant(ButtonVariant.Outline).WithSheet(
                     () => new EditInvoiceSheet(invoice),
                     title: "Edit Invoice",
                     description: $"Editing invoice #{invoice.InvoiceNumber}",
-                    width: Size.Fraction(1/2f)
+                    width: Size.Fraction(1 / 2f)
                 ))
                 .Add(new Button("Delete").Icon(Icons.Trash).Variant(ButtonVariant.Destructive)))
             .Add(new Card(
@@ -613,7 +740,7 @@ public class EditInvoiceSheet : ViewBase
                         onChange: e => { status.Value = e.Value; return ValueTask.CompletedTask; }
                     ))
             ).Title("Invoice Information"))
-            .Add(Layout.Horizontal()
+                    .Add(Layout.Horizontal()
                 .Gap(2)
                 .Add(new Button("Save").Variant(ButtonVariant.Primary).HandleClick(_ =>
                 {
@@ -632,7 +759,7 @@ public class PaymentsBlade : ViewBase
         var searchQuery = this.UseState("");
 
         var payments = db.Payments
-            .Where(p => searchQuery.Value == "" || 
+            .Where(p => searchQuery.Value == "" ||
                        p.Reference.Contains(searchQuery.Value))
             .OrderByDescending(p => p.PaymentDate)
             .ToList();
@@ -647,7 +774,7 @@ public class PaymentsBlade : ViewBase
                 .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search payments..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            payments.Count > 0 
+            payments.Count > 0
                 ? new List(items)
                 : new Card(
                     Layout.Vertical()
@@ -669,7 +796,7 @@ public class AccountsBlade : ViewBase
         var searchQuery = this.UseState("");
 
         var accounts = db.Accounts
-            .Where(a => searchQuery.Value == "" || 
+            .Where(a => searchQuery.Value == "" ||
                        a.AccountName.Contains(searchQuery.Value) ||
                        a.AccountNumber.Contains(searchQuery.Value))
             .OrderBy(a => a.AccountNumber)
@@ -694,7 +821,7 @@ public class AccountsBlade : ViewBase
                 .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search accounts..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            accounts.Count > 0 
+            accounts.Count > 0
                 ? new List(items)
                 : new Card(
                     Layout.Vertical()
@@ -719,7 +846,7 @@ public class AccountDetailBlade : ViewBase
     public override object? Build()
     {
         var db = this.UseService<ApplicationDbContext>();
-        
+
         var account = db.Accounts.FirstOrDefault(a => a.Id == _accountId);
         if (account == null)
         {
@@ -775,16 +902,16 @@ public class TransactionsBlade : ViewBase
         ));
 
         return BladeHelper.WithHeader(
-            Layout.Horizontal()
-                .Gap(2)
+                Layout.Horizontal()
+                    .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search transactions..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            transactions.Count > 0 
+            transactions.Count > 0
                 ? new List(items)
-                : new Card(
-                    Layout.Vertical()
-                        .Gap(2)
-                        .Padding(4)
+                        : new Card(
+                            Layout.Vertical()
+                                .Gap(2)
+                                .Padding(4)
                         .Add(Text.H4("No transactions found"))
                         .Add(Text.P("Your financial activity will appear here")))
         );
