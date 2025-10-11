@@ -48,7 +48,7 @@ public class OpportunitiesListBlade : ViewBase
         ListItem CreateItem(OpportunityListRecord record) =>
             new(title: record.Name, onClick: onItemClicked, tag: record, subtitle: $"{record.ContactName} - ${record.Amount:N0}");
 
-        var createBtn = Icons.Plus.ToButton(_ =>
+        var createBtn = new Button("Add Sale", _ =>
         {
             blades.Pop(this); // make sure only the current blade is visible
         }).ToTrigger((isOpen) => new OpportunityCreateDialog(isOpen, refreshToken));
@@ -77,8 +77,8 @@ public class OpportunitiesListBlade : ViewBase
             .OrderByDescending(e => e.ExpectedCloseDate)
             .Take(50)
             .Select(e => new OpportunityListRecord(
-                e.Id, 
-                e.Name, 
+                e.Id,
+                e.Name,
                 $"{e.Contact.FirstName} {e.Contact.LastName}".Trim(),
                 e.Amount,
                 e.Stage,
@@ -259,7 +259,7 @@ public class OpportunityEditSheet(IState<bool> isOpen, int id, RefreshToken refr
                 existingOpportunity.ContactId = opportunity.Value.ContactId;
                 existingOpportunity.Notes = opportunity.Value.Notes;
                 existingOpportunity.UpdatedAt = DateTime.UtcNow;
-                
+
                 db.SaveChanges();
                 refreshToken.Refresh();
             }
@@ -299,9 +299,9 @@ public static class OpportunityHelpers
         {
             var searchTerm = string.IsNullOrWhiteSpace(query) ? "" : query;
             return (await db.Contacts
-                    .Where(e => string.IsNullOrWhiteSpace(searchTerm) || 
-                               e.FirstName.Contains(searchTerm) || 
-                               e.LastName.Contains(searchTerm) || 
+                    .Where(e => string.IsNullOrWhiteSpace(searchTerm) ||
+                               e.FirstName.Contains(searchTerm) ||
+                               e.LastName.Contains(searchTerm) ||
                                e.Company.Contains(searchTerm))
                     .Select(e => new { e.Id, DisplayName = $"{e.FirstName} {e.LastName} ({e.Company})" })
                     .Take(50)
