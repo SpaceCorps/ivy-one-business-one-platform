@@ -18,6 +18,7 @@ public class PurchaseRootBlade : ViewBase
         var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
         var isNewPOOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
         
         var query = context.PurchaseOrders.AsQueryable();
         
@@ -54,7 +55,10 @@ public class PurchaseRootBlade : ViewBase
 
         return isNewPOOpen.Value ? new Sheet(
             (Event<Sheet> _) => isNewPOOpen.Set(false),
-            new PurchaseOrderFormSheet(null, () => isNewPOOpen.Set(false)),
+            new PurchaseOrderFormSheet(null, () => {
+                isNewPOOpen.Set(false);
+                refreshToken.Refresh();
+            }),
             title: "New Purchase Order",
             description: "Create a new purchase order"
             ).Width(Size.Fraction(1/3f)) : mainContent;
@@ -82,6 +86,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
         
         var currentStatus = this.UseState(order.Status);
         var isEditOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
         
         this.UseEffect(() =>
         {
@@ -92,6 +97,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                 dbOrder.Status = currentStatus.Value;
                 dbOrder.UpdatedAt = DateTime.UtcNow;
                 context.SaveChanges();
+                refreshToken.Refresh();
             }
         }, [currentStatus.ToTrigger()]);
         
@@ -152,6 +158,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                                 context.PurchaseOrders.Remove(orderToDelete);
                                 context.SaveChanges();
                                 client.Toast($"Purchase Order {order.OrderNumber} deleted successfully!");
+                                refreshToken.Refresh();
                                 blades.Pop();
                             }
                         }
@@ -164,7 +171,10 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                     .Variant(ButtonVariant.Secondary)))
             .Add(isEditOpen.Value ? new Sheet(
                 (Event<Sheet> _) => isEditOpen.Set(false),
-                new PurchaseOrderFormSheet(orderId, () => isEditOpen.Set(false)),
+                new PurchaseOrderFormSheet(orderId, () => {
+                    isEditOpen.Set(false);
+                    refreshToken.Refresh();
+                }),
                 title: "Edit Purchase Order",
                 description: $"Edit purchase order {order.OrderNumber}"
             ).Width(Size.Fraction(1/3f)) : null);
