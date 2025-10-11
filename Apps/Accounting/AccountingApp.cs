@@ -626,7 +626,7 @@ public class CreateInvoiceSheet : ViewBase
             ).Title("Customer Information"))
             .Add(new Card(
                 Layout.Vertical()
-                    .Gap(2)
+                        .Gap(2)
                     .Add(Text.Small("Amount *"))
                     .Add(amount.ToNumberInput().Placeholder("0.00"))
                     .Add(Text.Small("Tax Amount"))
@@ -640,8 +640,8 @@ public class CreateInvoiceSheet : ViewBase
                     .Add(Text.Small("Due Date"))
                     .Add(dueDate.ToDateInput())
             ).Title("Payment Terms"))
-            .Add(Layout.Horizontal()
-                .Gap(2)
+                    .Add(Layout.Horizontal()
+                        .Gap(2)
                 .Add(new Button("Create Invoice")
                     .Variant(ButtonVariant.Primary)
                     .HandleClick(onSave)
@@ -690,7 +690,7 @@ public class InvoiceDetailBlade : ViewBase
             ).Title("Invoice Details"))
             .Add(new Card(
                 Layout.Vertical()
-                    .Gap(2)
+                        .Gap(2)
                     .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Amount:")).Add(Text.Block($"${invoice.Amount:N2}")))
                     .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Tax:")).Add(Text.Block($"${invoice.TaxAmount:N2}")))
                     .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Total:")).Add(Text.H3($"${invoice.TotalAmount:N2}")))
@@ -716,11 +716,42 @@ public class EditInvoiceSheet : ViewBase
 
     public override object? Build()
     {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+        
         var customerName = this.UseState(_invoice.CustomerName);
         var amount = this.UseState(_invoice.Amount);
         var tax = this.UseState(_invoice.TaxAmount);
         var status = this.UseState(_invoice.Status);
-        var client = this.UseService<IClientProvider>();
+
+        var onSave = new Action<Event<Button>>(_ =>
+        {
+            try
+            {
+                // Find and update the invoice
+                var invoice = db.Invoices.FirstOrDefault(i => i.Id == _invoice.Id);
+                if (invoice != null)
+                {
+                    invoice.CustomerName = customerName.Value;
+                    invoice.Amount = amount.Value;
+                    invoice.TaxAmount = tax.Value;
+                    invoice.TotalAmount = amount.Value + tax.Value;
+                    invoice.Status = status.Value;
+                    invoice.UpdatedAt = DateTime.UtcNow;
+                    
+                    db.SaveChanges();
+                    client.Toast($"Invoice {invoice.InvoiceNumber} updated successfully!");
+                }
+                else
+                {
+                    client.Toast("Invoice not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                client.Toast($"Error updating invoice: {ex.Message}");
+            }
+        });
 
         return Layout.Vertical()
             .Gap(3)
@@ -733,6 +764,8 @@ public class EditInvoiceSheet : ViewBase
                     .Add(amount.ToNumberInput())
                     .Add(Text.Small("Tax"))
                     .Add(tax.ToNumberInput())
+                    .Add(Text.Small("Total"))
+                    .Add(Text.H3($"${amount.Value + tax.Value:N2}"))
                     .Add(Text.Small("Status"))
                     .Add(new SelectInput<string>(
                         options: new[] { "Draft", "Sent", "Paid", "Overdue" }.ToOptions(),
@@ -742,11 +775,7 @@ public class EditInvoiceSheet : ViewBase
             ).Title("Invoice Information"))
                     .Add(Layout.Horizontal()
                 .Gap(2)
-                .Add(new Button("Save").Variant(ButtonVariant.Primary).HandleClick(_ =>
-                {
-                    client.Toast("Invoice updated successfully!");
-                }))
-                .Add(new Button("Cancel").Variant(ButtonVariant.Outline)));
+                .Add(new Button("Save Changes").Variant(ButtonVariant.Primary).HandleClick(onSave)));
     }
 }
 
