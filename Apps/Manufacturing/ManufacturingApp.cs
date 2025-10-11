@@ -35,7 +35,7 @@ public class ManufacturingRootBlade : ViewBase
         
         var listItems = filteredWorkOrders.Select(wo => new ListItem(
             title: $"{wo.WorkOrderNumber} - {wo.ProductName}",
-            subtitle: $"Qty: {wo.Quantity} - {wo.Progress}% complete - Priority: {wo.Priority}",
+            subtitle: $"Qty: {wo.Quantity} - {wo.Progress}% complete",
             icon: Icons.Settings,
             badge: wo.Status,
             onClick: _ => { blades.Push(this, new WorkOrderDetailBlade(wo.Id), wo.WorkOrderNumber); return default; }
@@ -45,12 +45,111 @@ public class ManufacturingRootBlade : ViewBase
             Layout.Horizontal()
                 .Gap(8)
                 .Add(searchTerm.ToTextInput().Placeholder("Search work orders..."))
-                .Add(new Button("New Work Order", _ => client.Toast("Create work order"))
+                .Add(new Button("New Work Order")
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)),
+                    .Variant(ButtonVariant.Primary)
+                    .WithSheet(
+                        () => new CreateWorkOrderSheet(context, client),
+                        title: "Create Work Order",
+                        description: "Fill in the details to create a new manufacturing work order",
+                        width: Size.Fraction(1/3f)
+                    )),
             filteredWorkOrders.Count == 0 
                 ? Text.Block("No work orders found. Try adjusting your search or create a new work order!")
                 : new List(listItems)
+        );
+    }
+}
+
+public class CreateWorkOrderSheet : ViewBase
+{
+    private readonly ApplicationDbContext _context;
+    private readonly IClientProvider _client;
+
+    public CreateWorkOrderSheet(ApplicationDbContext context, IClientProvider client)
+    {
+        _context = context;
+        _client = client;
+    }
+
+    public override object? Build()
+    {
+        var workOrderNumber = this.UseState($"WO-{DateTime.UtcNow:yyyyMMddHHmmss}");
+        var productName = this.UseState("");
+        var quantity = this.UseState("0");
+        var priority = this.UseState("Normal");
+        var plannedStartDate = this.UseState(DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"));
+        var plannedEndDate = this.UseState(DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd"));
+        var notes = this.UseState("");
+
+        var priorities = new[] { "Low", "Normal", "High", "Urgent" };
+
+        return new FooterLayout(
+            Layout.Horizontal().Gap(8)
+                .Add(new Button("Create", _ => {
+                    if (string.IsNullOrWhiteSpace(productName.Value))
+                    {
+                        _client.Toast("Please enter product name");
+                        return default;
+                    }
+
+                    if (!int.TryParse(quantity.Value, out var qty) || qty <= 0)
+                    {
+                        _client.Toast("Please enter a valid quantity");
+                        return default;
+                    }
+
+                    var newWorkOrder = new WorkOrder
+                    {
+                        WorkOrderNumber = workOrderNumber.Value,
+                        ProductName = productName.Value,
+                        Quantity = qty,
+                        Status = "Scheduled",
+                        Progress = 0,
+                        Priority = priority.Value,
+                        PlannedStartDate = DateTime.Parse(plannedStartDate.Value),
+                        PlannedEndDate = DateTime.Parse(plannedEndDate.Value),
+                        Notes = string.IsNullOrWhiteSpace(notes.Value) ? null : notes.Value,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.WorkOrders.Add(newWorkOrder);
+                    _context.SaveChanges();
+                    
+                    _client.Toast($"Work order {workOrderNumber.Value} created successfully!");
+                    return default;
+                })
+                .Variant(ButtonVariant.Primary))
+                .Add(new Button("Cancel")
+                    .Variant(ButtonVariant.Outline)),
+            Layout.Vertical()
+                .Gap(16)
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("Work Order Number"))
+                        .Add(workOrderNumber.ToTextInput().Placeholder("WO-001").Disabled(true))
+                        .Add(Text.Small("Product Name *"))
+                        .Add(productName.ToTextInput().Placeholder("Enter product name"))
+                        .Add(Text.Small("Quantity *"))
+                        .Add(quantity.ToTextInput().Placeholder("Enter quantity"))
+                        .Add(Text.Small("Priority"))
+                        .Add(priority.ToSelectInput(priorities.Select(p => new Option<string>(p, p)).ToArray()))
+                ).Title("Basic Information"))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("Planned Start Date"))
+                        .Add(plannedStartDate.ToDateInput().Placeholder("YYYY-MM-DD"))
+                        .Add(Text.Small("Planned End Date"))
+                        .Add(plannedEndDate.ToDateInput().Placeholder("YYYY-MM-DD"))
+                ).Title("Schedule"))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(12)
+                        .Add(Text.Small("Notes (Optional)"))
+                        .Add(notes.ToTextInput().Placeholder("Add any additional notes..."))
+                ).Title("Additional Information"))
         );
     }
 }
@@ -69,33 +168,47 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
         if (workOrder == null)
             return "Work order not found";
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add(Text.H4(workOrder.WorkOrderNumber))
-                .Add(Layout.Vertical()
-                    .Gap(8)
-                    .Add($"Product: {workOrder.ProductName}")
-                    .Add($"Quantity: {workOrder.Quantity}")
-                    .Add($"Priority: {workOrder.Priority}")
-                    .Add($"Created: {workOrder.CreatedAt:MMM dd, yyyy}")
-                    .Add($"Planned Start: {workOrder.PlannedStartDate:MMM dd, yyyy}")
-                    .Add($"Planned End: {workOrder.PlannedEndDate:MMM dd, yyyy}")
-                    .Add(workOrder.StartDate.HasValue ? $"Actual Start: {workOrder.StartDate.Value:MMM dd, yyyy}" : "Not started yet")
-                    .Add(workOrder.CompletionDate.HasValue ? $"Completed: {workOrder.CompletionDate.Value:MMM dd, yyyy}" : null)
-                    .Add(new Badge(workOrder.Status)
-                        .Variant(workOrder.Status == "Completed" ? BadgeVariant.Success :
-                               workOrder.Status == "In Production" ? BadgeVariant.Primary :
-                               workOrder.Status == "Cancelled" ? BadgeVariant.Destructive :
-                               BadgeVariant.Secondary))
-                    .Add(new Badge(workOrder.Priority)
-                        .Variant(workOrder.Priority == "Urgent" ? BadgeVariant.Destructive :
-                               workOrder.Priority == "High" ? BadgeVariant.Warning :
-                               BadgeVariant.Outline))
+        return Layout.Vertical()
+            .Gap(16)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(12)
+                    .Add(Layout.Horizontal()
+                        .Gap(8)
+                        .Add(new Badge(workOrder.Status)
+                            .Variant(workOrder.Status == "Completed" ? BadgeVariant.Success :
+                                   workOrder.Status == "In Production" ? BadgeVariant.Primary :
+                                   workOrder.Status == "Cancelled" ? BadgeVariant.Destructive :
+                                   BadgeVariant.Secondary))
+                        .Add(new Badge(workOrder.Priority)
+                            .Variant(workOrder.Priority == "Urgent" ? BadgeVariant.Destructive :
+                                   workOrder.Priority == "High" ? BadgeVariant.Warning :
+                                   BadgeVariant.Outline)))
                     .Add(new Progress(workOrder.Progress))
-                    .Add(workOrder.Notes != null ? $"Notes: {workOrder.Notes}" : null))
-                .Add(Layout.Horizontal()
+            ).Title(workOrder.WorkOrderNumber))
+            .Add(new Card(
+                new {
+                    WorkOrderNumber = workOrder.WorkOrderNumber,
+                    ProductName = workOrder.ProductName,
+                    Quantity = workOrder.Quantity,
+                    Priority = workOrder.Priority,
+                    Status = workOrder.Status,
+                    Progress = $"{workOrder.Progress}%",
+                    Created = workOrder.CreatedAt.ToString("MMM dd, yyyy"),
+                    PlannedStart = workOrder.PlannedStartDate.ToString("MMM dd, yyyy"),
+                    PlannedEnd = workOrder.PlannedEndDate.ToString("MMM dd, yyyy"),
+                    ActualStart = workOrder.StartDate?.ToString("MMM dd, yyyy"),
+                    CompletionDate = workOrder.CompletionDate?.ToString("MMM dd, yyyy"),
+                    Notes = workOrder.Notes
+                }
+                .ToDetails()
+                .Remove(x => x.WorkOrderNumber)
+                .RemoveEmpty()
+                .MultiLine(x => x.Notes)
+                .Builder(x => x.WorkOrderNumber, b => b.CopyToClipboard())
+            ).Title("Work Order Details"))
+            .Add(new Card(
+                Layout.Horizontal()
                     .Gap(12)
                     .Add(new Button("Update Progress", _ => client.Toast("Update progress"))
                         .Variant(ButtonVariant.Primary))
@@ -119,7 +232,7 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             return default;
                         })
                             .Variant(ButtonVariant.Primary)
-                        : null))
-        );
+                        : null)
+            ).Title("Actions"));
     }
 }
