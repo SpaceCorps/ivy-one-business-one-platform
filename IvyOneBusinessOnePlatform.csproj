@@ -16,7 +16,6 @@
     <PackageReference Include="Ivy" Version="1.*" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Apps" />
     <Folder Include="Connections" />
   </ItemGroup>
 
