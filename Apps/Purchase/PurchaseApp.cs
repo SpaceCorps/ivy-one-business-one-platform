@@ -39,25 +39,25 @@ public class PurchaseRootBlade : ViewBase
             onClick: _ => blades.Push(this, new PurchaseOrderDetailBlade(order.Id), order.OrderNumber)
         ));
         
-        return Layout.Vertical()
-            .Add(BladeHelper.WithHeader(
-                Layout.Horizontal()
-                    .Gap(4)
-                    .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
-                    .Add(new Button("New PO")
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary)
-                        .HandleClick(_ => isNewPOOpen.Set(true))),
-                orders.Count == 0 
-                    ? Text.Block("No purchase orders found. Try a different search or create your first order!")
-                    : new List(listItems)
-            ))
-            .Add(isNewPOOpen.Value ? new Sheet(
-                (Event<Sheet> _) => isNewPOOpen.Set(false),
-                new PurchaseOrderFormSheet(null, () => isNewPOOpen.Set(false)),
-                title: "New Purchase Order",
-                description: "Create a new purchase order"
-            ).Width(Size.Fraction(2/3f)) : null);
+        var mainContent = BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(4)
+                .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
+                .Add(new Button("New PO")
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => isNewPOOpen.Set(true))),
+            orders.Count == 0 
+                ? Text.Block("No purchase orders found. Try a different search or create your first order!")
+                : new List(listItems)
+        );
+
+        return isNewPOOpen.Value ? new Sheet(
+            (Event<Sheet> _) => isNewPOOpen.Set(false),
+            new PurchaseOrderFormSheet(null, () => isNewPOOpen.Set(false)),
+            title: "New Purchase Order",
+            description: "Create a new purchase order"
+        ).Width(Size.Fraction(2/3f)) : mainContent;
     }
 }
 
