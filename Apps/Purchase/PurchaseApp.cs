@@ -42,7 +42,7 @@ public class PurchaseRootBlade : ViewBase
             Layout.Horizontal()
                 .Gap(4)
                 .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
-                .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
+                .Add(new Button("New PO", _ => client.Toast("Create PO"))
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)),
             orders.Count == 0 
