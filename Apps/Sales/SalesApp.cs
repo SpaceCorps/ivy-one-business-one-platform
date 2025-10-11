@@ -100,8 +100,7 @@ public class OpportunityDetailsBlade(int opportunityId) : ViewBase
 
         this.UseEffect(async () =>
         {
-            var foundOpportunity = await db.Opportunities.Include(e => e.Contact).SingleOrDefaultAsync(e => e.Id == opportunityId);
-            opportunity.Set(foundOpportunity);
+            opportunity.Set(await db.Opportunities.Include(e => e.Contact).SingleOrDefaultAsync(e => e.Id == opportunityId));
         }, [EffectTrigger.AfterInit(), refreshToken]);
 
         if (opportunity.Value == null) return new Error("Opportunity not found.");
