@@ -8,7 +8,7 @@ public class DashboardApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new DashboardRootBlade(), "Dashboard", Size.Units(95));
+        return this.UseBlades(() => new DashboardRootBlade(), "Dashboard", Size.Units(120));
     }
 }
 
