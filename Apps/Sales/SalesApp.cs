@@ -14,7 +14,7 @@ public class SalesApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new OpportunitiesListBlade(), "Search", Size.Units(75));
+        return this.UseBlades(() => new OpportunitiesListBlade(), "Search", Size.Units(80));
     }
 }
 
@@ -24,22 +24,11 @@ public class OpportunitiesListBlade : ViewBase
 {
     public override object? Build()
     {
-        //This blade will display a list of opportunities using vertical layout with cards for better visual presentation.
+        //This blade will display a list of opportunities - we choose to include the name, contact, amount, stage, probability and expected close date as these are the most relevant fields for sales management.
 
         var blades = this.UseContext<IBladeController>();
         var factory = this.UseService<ApplicationDbContext>();
         var refreshToken = this.UseRefreshToken();
-        var opportunities = this.UseState<OpportunityListRecord[]>(() => Array.Empty<OpportunityListRecord>());
-        var filter = this.UseState<string>(() => "");
-        var isLoading = this.UseState<bool>(() => true);
-
-        this.UseEffect(async () =>
-        {
-            isLoading.Set(true);
-            var results = await FetchOpportunities(factory, filter.Value);
-            opportunities.Set(results);
-            isLoading.Set(false);
-        }, [EffectTrigger.AfterInit(), filter, refreshToken]);
 
         this.UseEffect(() =>
         {
@@ -50,77 +39,30 @@ public class OpportunitiesListBlade : ViewBase
             }
         }, [refreshToken]);
 
-        var onItemClicked = new Action<OpportunityListRecord>(opportunity =>
+        var onItemClicked = new Action<Event<ListItem>>(e =>
         {
-            blades.Push(this, new OpportunityDetailsBlade(opportunity.Id), opportunity.Name, width: Size.Units(100));
+            var opportunity = (OpportunityListRecord)e.Sender.Tag!;
+            blades.Push(this, new OpportunityDetailsBlade(opportunity.Id), opportunity.Name, width: Size.Units(100)); // by setting the width we avoid jank when different blades are opened   
         });
+
+        ListItem CreateItem(OpportunityListRecord record) =>
+            new(title: record.Name, onClick: onItemClicked, tag: record, subtitle: $"{record.ContactName} - ${record.Amount:N0}");
 
         var createBtn = Icons.Plus.ToButton(_ =>
         {
             blades.Pop(this); // make sure only the current blade is visible
         }).ToTrigger((isOpen) => new OpportunityCreateDialog(isOpen, refreshToken));
 
-        var searchInput = filter.ToTextInput().Placeholder("Search opportunities...");
-
-        if (isLoading.Value)
-        {
-            return Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Width(Size.Full())
-                    .Add(searchInput.Width(Size.Grow()))
-                    .Add(createBtn))
-                .Add(Text.P("Loading opportunities..."));
-        }
-
-        var opportunityItems = opportunities.Value.Select(opportunity => CreateOpportunityItem(opportunity, onItemClicked)).ToArray();
-
-        return Layout.Vertical()
-            .Gap(16)
-            .Padding(16)
-            .Add(Layout.Horizontal()
-                .Gap(12)
-                .Width(Size.Full())
-                .Add(searchInput.Width(Size.Grow()))
-                .Add(createBtn))
-            .Add(opportunityItems.Length == 0 
-                ? Text.Block("No opportunities found.")
-                : new List(opportunityItems));
-    }
-
-    private ListItem CreateOpportunityItem(OpportunityListRecord opportunity, Action<OpportunityListRecord> onClick)
-    {
-        var stageColor = GetStageColor(opportunity.Stage);
-        var probabilityColor = GetProbabilityColor(opportunity.Probability);
-
-        return new ListItem(
-            title: opportunity.Name,
-            subtitle: $"{opportunity.ContactName} - {opportunity.Amount:C} - Expected: {opportunity.ExpectedCloseDate:MMM dd, yyyy}",
-            icon: Icons.TrendingUp,
-            badge: $"{opportunity.Stage} ({opportunity.Probability}%)",
-            onClick: _ => { onClick(opportunity); return default; }
+        return new FilteredListView<OpportunityListRecord>(
+            fetchRecords: (filter) => FetchOpportunities(factory, filter),
+            createItem: CreateItem,
+            toolButtons: createBtn,
+            onFilterChanged: _ =>
+            {
+                blades.Pop(this);
+            }
         );
     }
-
-    private BadgeVariant GetStageColor(string stage) => stage switch
-    {
-        "Closed Won" => BadgeVariant.Success,
-        "Closed Lost" => BadgeVariant.Destructive,
-        "Proposal" => BadgeVariant.Primary,
-        "Negotiation" => BadgeVariant.Warning,
-        "Qualification" => BadgeVariant.Secondary,
-        _ => BadgeVariant.Outline
-    };
-
-    private BadgeVariant GetProbabilityColor(int probability) => probability switch
-    {
-        >= 80 => BadgeVariant.Success,
-        >= 60 => BadgeVariant.Warning,
-        >= 40 => BadgeVariant.Secondary,
-        _ => BadgeVariant.Outline
-    };
 
     private async Task<OpportunityListRecord[]> FetchOpportunities(ApplicationDbContext db, string filter)
     {
