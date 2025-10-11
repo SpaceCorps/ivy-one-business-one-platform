@@ -14,7 +14,309 @@ public class AccountingApp : ViewBase
 {
     public override object? Build()
     {
+        var seeded = this.UseState(false);
+        
+        // Seed mock data if needed
+        this.UseEffect(() =>
+        {
+            if (!seeded.Value)
+            {
+                seeded.Value = true;
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    // Wait a bit for the app to fully initialize
+                    await System.Threading.Tasks.Task.Delay(1000);
+                    await SeedAccountingDataAsync();
+                });
+            }
+        }, []);
+        
         return this.UseBlades(() => new AccountingMenuBlade(), "Accounting");
+    }
+    
+    private static async System.Threading.Tasks.Task SeedAccountingDataAsync()
+    {
+        try
+        {
+            // Create a new DbContext directly
+            var connectionString = "Data Source=business_platform.db";
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseSqlite(connectionString);
+            
+            using var db = new ApplicationDbContext(optionsBuilder.Options);
+            
+            // Only seed if no invoices exist
+            if (await db.Invoices.AnyAsync())
+                return;
+            
+        // Seed invoices
+        var invoices = new[]
+        {
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-001",
+                IssueDate = DateTime.UtcNow.AddDays(-30),
+                DueDate = DateTime.UtcNow.AddDays(-15),
+                Amount = 4500.00m,
+                TaxAmount = 450.00m,
+                TotalAmount = 4950.00m,
+                Status = "Overdue",
+                CustomerName = "Acme Corporation",
+                CustomerEmail = "accounts@acme.com",
+                Description = "Consulting services for Q4"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-002",
+                IssueDate = DateTime.UtcNow.AddDays(-25),
+                DueDate = DateTime.UtcNow.AddDays(-10),
+                Amount = 7500.00m,
+                TaxAmount = 750.00m,
+                TotalAmount = 8250.00m,
+                Status = "Paid",
+                CustomerName = "TechStart Inc",
+                CustomerEmail = "billing@techstart.com",
+                Description = "Software development - Phase 1"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-003",
+                IssueDate = DateTime.UtcNow.AddDays(-20),
+                DueDate = DateTime.UtcNow.AddDays(-5),
+                Amount = 3200.00m,
+                TaxAmount = 320.00m,
+                TotalAmount = 3520.00m,
+                Status = "Paid",
+                CustomerName = "Global Enterprises",
+                CustomerEmail = "finance@global-ent.com",
+                Description = "Monthly maintenance services"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-004",
+                IssueDate = DateTime.UtcNow.AddDays(-15),
+                DueDate = DateTime.UtcNow,
+                Amount = 5800.00m,
+                TaxAmount = 580.00m,
+                TotalAmount = 6380.00m,
+                Status = "Sent",
+                CustomerName = "Innovate Labs",
+                CustomerEmail = "ap@innovatelabs.com",
+                Description = "Custom integration services"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-005",
+                IssueDate = DateTime.UtcNow.AddDays(-10),
+                DueDate = DateTime.UtcNow.AddDays(5),
+                Amount = 2100.00m,
+                TaxAmount = 210.00m,
+                TotalAmount = 2310.00m,
+                Status = "Sent",
+                CustomerName = "SmartRetail Co",
+                CustomerEmail = "accounting@smartretail.com",
+                Description = "Training and support services"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-006",
+                IssueDate = DateTime.UtcNow.AddDays(-5),
+                DueDate = DateTime.UtcNow.AddDays(10),
+                Amount = 9500.00m,
+                TaxAmount = 950.00m,
+                TotalAmount = 10450.00m,
+                Status = "Draft",
+                CustomerName = "MegaCorp Industries",
+                CustomerEmail = "payables@megacorp.com",
+                Description = "Enterprise solution - Phase 2"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-007",
+                IssueDate = DateTime.UtcNow.AddDays(-3),
+                DueDate = DateTime.UtcNow.AddDays(12),
+                Amount = 1850.00m,
+                TaxAmount = 185.00m,
+                TotalAmount = 2035.00m,
+                Status = "Sent",
+                CustomerName = "BrightFuture LLC",
+                CustomerEmail = "billing@brightfuture.com",
+                Description = "UI/UX design consultation"
+            },
+            new Invoice
+            {
+                InvoiceNumber = "INV-2024-008",
+                IssueDate = DateTime.UtcNow.AddDays(-1),
+                DueDate = DateTime.UtcNow.AddDays(14),
+                Amount = 6700.00m,
+                TaxAmount = 670.00m,
+                TotalAmount = 7370.00m,
+                Status = "Draft",
+                CustomerName = "DataDrive Systems",
+                CustomerEmail = "accounts@datadrive.com",
+                Description = "Cloud migration services"
+            }
+        };
+        
+        db.Invoices.AddRange(invoices);
+        await db.SaveChangesAsync();
+        
+        // Seed payments
+        var payments = new[]
+        {
+            new Payment
+            {
+                InvoiceId = invoices[1].Id,
+                Amount = 8250.00m,
+                PaymentDate = DateTime.UtcNow.AddDays(-10),
+                PaymentMethod = "Bank Transfer",
+                Reference = "PMT-2024-001",
+                Notes = "Full payment via wire transfer"
+            },
+            new Payment
+            {
+                InvoiceId = invoices[2].Id,
+                Amount = 3520.00m,
+                PaymentDate = DateTime.UtcNow.AddDays(-5),
+                PaymentMethod = "Credit Card",
+                Reference = "PMT-2024-002",
+                Notes = "Paid by Visa ending in 4532"
+            },
+            new Payment
+            {
+                InvoiceId = invoices[1].Id,
+                Amount = 2000.00m,
+                PaymentDate = DateTime.UtcNow.AddDays(-20),
+                PaymentMethod = "Check",
+                Reference = "PMT-2024-003",
+                Notes = "Partial payment - Check #2456"
+            }
+        };
+        
+        db.Payments.AddRange(payments);
+        await db.SaveChangesAsync();
+        
+        // Seed transactions
+        var transactions = new[]
+        {
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-001",
+                TransactionDate = DateTime.UtcNow.AddDays(-30),
+                Description = "Revenue from INV-2024-002",
+                DebitAmount = 8250.00m,
+                CreditAmount = 0,
+                Reference = "INV-2024-002"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-002",
+                TransactionDate = DateTime.UtcNow.AddDays(-28),
+                Description = "Office rent payment",
+                DebitAmount = 3500.00m,
+                CreditAmount = 0,
+                Reference = "RENT-OCT-2024"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-003",
+                TransactionDate = DateTime.UtcNow.AddDays(-25),
+                Description = "Equipment purchase",
+                DebitAmount = 5400.00m,
+                CreditAmount = 0,
+                Reference = "PO-002"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-004",
+                TransactionDate = DateTime.UtcNow.AddDays(-20),
+                Description = "Revenue from INV-2024-003",
+                DebitAmount = 3520.00m,
+                CreditAmount = 0,
+                Reference = "INV-2024-003"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-005",
+                TransactionDate = DateTime.UtcNow.AddDays(-18),
+                Description = "Utility bills payment",
+                DebitAmount = 850.00m,
+                CreditAmount = 0,
+                Reference = "UTIL-OCT-2024"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-006",
+                TransactionDate = DateTime.UtcNow.AddDays(-15),
+                Description = "Payroll expenses",
+                DebitAmount = 15600.00m,
+                CreditAmount = 0,
+                Reference = "PAYROLL-OCT-2024"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-007",
+                TransactionDate = DateTime.UtcNow.AddDays(-12),
+                Description = "Software subscriptions",
+                DebitAmount = 1250.00m,
+                CreditAmount = 0,
+                Reference = "SUBS-OCT-2024"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-008",
+                TransactionDate = DateTime.UtcNow.AddDays(-10),
+                Description = "Marketing expenses",
+                DebitAmount = 2800.00m,
+                CreditAmount = 0,
+                Reference = "MARKETING-OCT-2024"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-009",
+                TransactionDate = DateTime.UtcNow.AddDays(-8),
+                Description = "Client refund",
+                DebitAmount = 0,
+                CreditAmount = 750.00m,
+                Reference = "REFUND-2024-001"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-010",
+                TransactionDate = DateTime.UtcNow.AddDays(-5),
+                Description = "Office supplies purchase",
+                DebitAmount = 425.00m,
+                CreditAmount = 0,
+                Reference = "PO-001"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-011",
+                TransactionDate = DateTime.UtcNow.AddDays(-3),
+                Description = "Travel expenses reimbursement",
+                DebitAmount = 1340.00m,
+                CreditAmount = 0,
+                Reference = "EXP-2024-045"
+            },
+            new Transaction
+            {
+                TransactionNumber = "TXN-2024-012",
+                TransactionDate = DateTime.UtcNow.AddDays(-1),
+                Description = "Bank service charges",
+                DebitAmount = 85.00m,
+                CreditAmount = 0,
+                Reference = "BANK-FEES-OCT"
+            }
+        };
+        
+        db.Transactions.AddRange(transactions);
+        await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log or ignore seeding errors
+            Console.WriteLine($"Error seeding accounting data: {ex.Message}");
+        }
     }
 }
 
