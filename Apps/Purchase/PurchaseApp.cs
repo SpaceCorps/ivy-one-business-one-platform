@@ -16,8 +16,19 @@ public class PurchaseRootBlade : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var searchQuery = this.UseState("");
         
-        var orders = context.PurchaseOrders.OrderByDescending(po => po.OrderDate).ToList();
+        var query = context.PurchaseOrders.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(searchQuery.Value))
+        {
+            query = query.Where(po => 
+                po.OrderNumber.Contains(searchQuery.Value) ||
+                po.Supplier.Contains(searchQuery.Value) ||
+                po.Department.Contains(searchQuery.Value));
+        }
+        
+        var orders = query.OrderByDescending(po => po.OrderDate).ToList();
         
         var listItems = orders.Select(order => new ListItem(
             title: $"{order.OrderNumber} - {order.Supplier}",
@@ -31,11 +42,13 @@ public class PurchaseRootBlade : ViewBase
             .Gap(4)
             .Add(Layout.Horizontal()
                 .Gap(4)
+                .Add(Text.H3("Purchase Orders"))
                 .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)))
+            .Add(searchQuery.ToSearchInput().Placeholder("Search orders by number, supplier, or department..."))
             .Add(orders.Count == 0 
-                ? Text.Block("No purchase orders yet. Create your first order!")
+                ? Text.Block("No purchase orders found. Try a different search or create your first order!")
                 : new List(listItems));
     }
 }
