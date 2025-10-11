@@ -57,7 +57,7 @@ public class PurchaseRootBlade : ViewBase
             new PurchaseOrderFormSheet(null, () => isNewPOOpen.Set(false)),
             title: "New Purchase Order",
             description: "Create a new purchase order"
-        ).Width(Size.Fraction(2/3f)) : mainContent;
+            ).Width(Size.Fraction(1/3f)) : mainContent;
     }
 }
 
@@ -140,6 +140,26 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                     .Variant(ButtonVariant.Outline)
                     .Icon(Icons.Pencil)
                     .HandleClick(_ => isEditOpen.Set(true)))
+                .Add(new Button("Delete Order")
+                    .Variant(ButtonVariant.Destructive)
+                    .Icon(Icons.Trash)
+                    .HandleClick(_ => {
+                        try
+                        {
+                            var orderToDelete = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+                            if (orderToDelete != null)
+                            {
+                                context.PurchaseOrders.Remove(orderToDelete);
+                                context.SaveChanges();
+                                client.Toast($"Purchase Order {order.OrderNumber} deleted successfully!");
+                                blades.Pop();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Toast($"Error deleting order: {ex.Message}", "Error");
+                        }
+                    }))
                 .Add(new Button("Cancel", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary)))
             .Add(isEditOpen.Value ? new Sheet(
@@ -147,7 +167,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                 new PurchaseOrderFormSheet(orderId, () => isEditOpen.Set(false)),
                 title: "Edit Purchase Order",
                 description: $"Edit purchase order {order.OrderNumber}"
-            ).Width(Size.Fraction(2/3f)) : null);
+            ).Width(Size.Fraction(1/3f)) : null);
     }
 }
 
