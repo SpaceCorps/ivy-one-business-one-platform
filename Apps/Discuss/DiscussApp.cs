@@ -5,10 +5,42 @@ public class DiscussApp : ViewBase
 {
     public override object? Build()
     {
-        var client = this.UseService<IClientProvider>();
-        var selectedChannel = this.UseState("general");
+        return this.UseBlades(() => new DiscussRootBlade(), "Discuss");
+    }
+}
+
+public class DiscussRootBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var blades = this.UseContext<IBladeController>();
         
-        var channels = new[] { "general", "support", "sales", "development" };
+        var channels = new[]
+        {
+            new { Name = "general", Description = "General discussion", Count = 45 },
+            new { Name = "support", Description = "Customer support", Count = 12 },
+            new { Name = "sales", Description = "Sales team chat", Count = 8 },
+            new { Name = "development", Description = "Dev team discussions", Count = 23 }
+        };
+        
+        var listItems = channels.Select(ch => new ListItem(
+            title: $"#{ch.Name}",
+            subtitle: ch.Description,
+            icon: Icons.MessageCircle,
+            badge: ch.Count.ToString(),
+            onClick: _ => { blades.Push(this, new ChannelBlade(ch.Name), $"#{ch.Name}"); }
+        ));
+        
+        return new List(listItems);
+    }
+}
+
+public class ChannelBlade(string channelName) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        
         var messages = new[]
         {
             new { User = "John Doe", Message = "Welcome to the discussion!", Time = DateTime.Now.AddMinutes(-30) },
@@ -16,44 +48,20 @@ public class DiscussApp : ViewBase
             new { User = "Bob Johnson", Message = "How can I help you today?", Time = DateTime.Now.AddMinutes(-10) }
         };
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(24)
-                .Add("Team Discussion")
-                .Add("Communicate with your team in real-time")
-                .Add(Layout.Grid()
-                    .Columns(4)
-                    .Gap(12)
-                    .Add(channels.Select(ch => new Button($"#{ch}", _ => {
-                        selectedChannel.Set(ch);
-                        client.Toast($"Switched to #{ch}");
-                    })
-                        .Small()
-                        .Variant(selectedChannel.Value == ch ? ButtonVariant.Primary : ButtonVariant.Outline))))
-                .Add(new Card(
-                    Layout.Vertical()
-                        .Gap(12)
-                        .Padding(16)
-                        .Add($"#{selectedChannel.Value}")
-                        .Add(Layout.Vertical()
-                            .Gap(8)
-                            .Add(messages.Select(msg => new Card(
-                                Layout.Vertical()
-                                    .Gap(4)
-                                    .Padding(12)
-                                    .Add(Layout.Horizontal()
-                                        .Gap(8)
-                                        .Add(new Badge(msg.User).Variant(BadgeVariant.Secondary))
-                                        .Add(new Badge(msg.Time.ToString("HH:mm")).Variant(BadgeVariant.Outline)))
-                                    .Add(msg.Message)
-                            ))))
-                        .Add(Layout.Horizontal()
-                            .Gap(8)
-                            .Add(new TextInput(UseState("")).Placeholder("Type your message..."))
-                            .Add(new Button("Send", _ => client.Toast("Message sent!"))
-                                .Variant(ButtonVariant.Primary)
-                                .Icon(Icons.Send)))))
+        var listItems = messages.Select(msg => new ListItem(
+            title: msg.User,
+            subtitle: $"{msg.Time:HH:mm} - {msg.Message}",
+            icon: Icons.User
+        ));
+        
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(8)
+                .Add(new TextInput(UseState("")).Placeholder("Type your message..."))
+                .Add(new Button("Send", _ => client.Toast("Message sent!"))
+                    .Variant(ButtonVariant.Primary)
+                    .Icon(Icons.Send)),
+            new List(listItems)
         );
     }
 }
