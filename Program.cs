@@ -1,5 +1,17 @@
 using IvyOneBusinessOnePlatform.Apps;
+using IvyOneBusinessOnePlatform.Services;
+
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
+
+// Configure services
+var services = new ServiceCollection();
+services.AddDatabase();
+
+var serviceProvider = services.BuildServiceProvider();
+
+// Initialize database
+await serviceProvider.InitializeDatabaseAsync();
+
 var server = new Server();
 #if DEBUG
 server.UseHotReload();
