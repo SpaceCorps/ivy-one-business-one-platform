@@ -49,28 +49,63 @@ public class PurchaseOrderDetailBlade(string id, string supplier, decimal amount
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
+        var blades = this.UseContext<IBladeController>();
+        var currentStatus = this.UseState(status);
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add(id)
-                .Add(Layout.Vertical()
-                    .Gap(8)
-                    .Add($"Supplier: {supplier}")
-                    .Add($"Amount: ${amount:N2}")
-                    .Add(new Badge(status)
-                        .Variant(status == "Received" ? BadgeVariant.Success :
-                               status == "Approved" ? BadgeVariant.Primary :
-                               BadgeVariant.Secondary)))
-                .Add(Layout.Horizontal()
+        return Layout.Vertical()
+            .Gap(16)
+            .Padding(24)
+            .Add(Text.H3($"Purchase Order {id}"))
+            .Add(new Card(
+                Layout.Vertical()
                     .Gap(12)
-                    .Add(new Button("View Details", _ => client.Toast("View PO"))
-                        .Variant(ButtonVariant.Primary))
-                    .Add(status == "Pending" 
-                        ? new Button("Approve", _ => client.Toast("PO approved"))
-                            .Variant(ButtonVariant.Success)
-                        : null))
-        );
+                    .Padding(16)
+                    .Add(Layout.Vertical()
+                        .Gap(8)
+                        .Add(Text.Label("Supplier"))
+                        .Add(Text.Block(supplier)))
+                    .Add(Layout.Vertical()
+                        .Gap(8)
+                        .Add(Text.Label("Amount"))
+                        .Add(Text.Block($"${amount:N2}")))
+                    .Add(Layout.Vertical()
+                        .Gap(8)
+                        .Add(Text.Label("Status"))
+                        .Add(new Badge(currentStatus.Value)
+                            .Variant(currentStatus.Value == "Received" ? BadgeVariant.Success :
+                                   currentStatus.Value == "Approved" ? BadgeVariant.Primary :
+                                   BadgeVariant.Secondary)))))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(12)
+                    .Padding(16)
+                    .Add(Text.Label("Order Details"))
+                    .Add($"Order Date: {DateTime.Now.AddDays(-7):MMM dd, yyyy}")
+                    .Add($"Expected Delivery: {DateTime.Now.AddDays(14):MMM dd, yyyy}")
+                    .Add($"Payment Terms: Net 30")
+                    .Add($"Department: Operations")))
+            .Add(Layout.Horizontal()
+                .Gap(12)
+                .Add(currentStatus.Value == "Pending" 
+                    ? new Button("Approve Order", _ => {
+                        currentStatus.Set("Approved");
+                        client.Toast($"Purchase Order {id} approved!");
+                    })
+                        .Variant(ButtonVariant.Success)
+                        .Icon(Icons.Check)
+                    : null)
+                .Add(currentStatus.Value == "Approved" 
+                    ? new Button("Mark as Received", _ => {
+                        currentStatus.Set("Received");
+                        client.Toast($"Purchase Order {id} marked as received!");
+                    })
+                        .Variant(ButtonVariant.Primary)
+                        .Icon(Icons.Package)
+                    : null)
+                .Add(new Button("Edit Order", _ => client.Toast("Edit functionality coming soon"))
+                    .Variant(ButtonVariant.Outline)
+                    .Icon(Icons.Pencil))
+                .Add(new Button("Cancel", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary)));
     }
 }
