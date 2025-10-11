@@ -8,232 +8,259 @@ public class AccountingApp : ViewBase
 {
     public override object? Build()
     {
+        return this.UseBlades(() => new AccountingRootBlade(), "Accounting");
+    }
+}
+
+public class AccountingRootBlade : ViewBase
+{
+    public override object? Build()
+    {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
         
-        var selectedView = this.UseState("dashboard");
-        
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(24)
-                .Add("Accounting System")
-                .Add("Manage your financial records, invoices, and reports")
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("Dashboard", _ => selectedView.Set("dashboard"))
-                        .Variant(selectedView.Value == "dashboard" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Invoices", _ => selectedView.Set("invoices"))
-                        .Variant(selectedView.Value == "invoices" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Accounts", _ => selectedView.Set("accounts"))
-                        .Variant(selectedView.Value == "accounts" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                    .Add(new Button("Transactions", _ => selectedView.Set("transactions"))
-                        .Variant(selectedView.Value == "transactions" ? ButtonVariant.Primary : ButtonVariant.Secondary))
-                )
-                .Add(BuildSelectedView(selectedView.Value, context, client))
-        );
-    }
-
-    private object BuildSelectedView(string view, ApplicationDbContext context, IClientProvider client)
-    {
-        return view switch
-        {
-            "dashboard" => BuildDashboard(context, client),
-            "invoices" => BuildInvoicesView(context, client),
-            "accounts" => BuildAccountsView(context, client),
-            "transactions" => BuildTransactionsView(context, client),
-            _ => "Select a view"
-        };
-    }
-
-    private object BuildDashboard(ApplicationDbContext context, IClientProvider client)
-    {
         var invoices = context.Invoices.ToList();
         var accounts = context.Accounts.ToList();
         var transactions = context.Transactions.ToList();
 
         var totalRevenue = invoices.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount);
         var pendingInvoices = invoices.Where(i => i.Status != "Paid").Sum(i => i.TotalAmount);
-        var totalAccounts = accounts.Count;
-        var totalTransactions = transactions.Count;
-
-        return new Card(
+        
+        var menuItems = new[]
+        {
+            new ListItem("Invoices", 
+                subtitle: $"{invoices.Count} total, ${pendingInvoices:N2} pending",
+                icon: Icons.FileText,
+                badge: invoices.Count.ToString(),
+                onClick: _ => blades.Push(this, new InvoicesBlade(), "Invoices")),
+            new ListItem("Chart of Accounts",
+                subtitle: $"{accounts.Count} accounts, ${accounts.Sum(a => a.Balance):N2} total",
+                icon: Icons.Book,
+                badge: accounts.Count.ToString(),
+                onClick: _ => blades.Push(this, new AccountsBlade(), "Accounts")),
+            new ListItem("Transactions",
+                subtitle: $"{transactions.Count} entries",
+                icon: Icons.ArrowLeftRight,
+                badge: transactions.Count.ToString(),
+                onClick: _ => blades.Push(this, new TransactionsBlade(), "Transactions"))
+        };
+        
+        return BladeHelper.WithHeader(
             Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
+                .Gap(12)
                 .Add("Financial Dashboard")
                 .Add(Layout.Grid()
-                    .Columns(4)
-                    .Gap(16)
-                    .Add(new Card(
-                        Layout.Vertical()
-                            .Gap(8)
-                            .Padding(16)
-                            .Add("Total Revenue")
-                            .Add($"${totalRevenue:N2}")
-                            .Add("Paid invoices")
-                    ))
-                    .Add(new Card(
-                        Layout.Vertical()
-                            .Gap(8)
-                            .Padding(16)
-                            .Add("Pending Invoices")
-                            .Add($"${pendingInvoices:N2}")
-                            .Add("Unpaid amount")
-                    ))
-                    .Add(new Card(
-                        Layout.Vertical()
-                            .Gap(8)
-                            .Padding(16)
-                            .Add("Chart of Accounts")
-                            .Add(totalAccounts.ToString())
-                            .Add("Total accounts")
-                    ))
-                    .Add(new Card(
-                        Layout.Vertical()
-                            .Gap(8)
-                            .Padding(16)
-                            .Add("Transactions")
-                            .Add(totalTransactions.ToString())
-                            .Add("Total transactions")
-                    ))
-                )
+                    .Columns(2)
+                    .Gap(12)
+                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
+                        .Add("Total Revenue").Add($"${totalRevenue:N2}").Add("Paid invoices")))
+                    .Add(new Card(Layout.Vertical().Gap(4).Padding(12)
+                        .Add("Pending").Add($"${pendingInvoices:N2}").Add("Unpaid amount")))),
+            new List(menuItems)
         );
     }
+}
 
-    private object BuildInvoicesView(ApplicationDbContext context, IClientProvider client)
+public class InvoicesBlade : ViewBase
+{
+    public override object? Build()
     {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
         var invoices = context.Invoices.OrderByDescending(i => i.IssueDate).ToList();
         
+        var listItems = invoices.Select(invoice => new ListItem(
+            title: $"#{invoice.InvoiceNumber} - {invoice.CustomerName}",
+            subtitle: $"${invoice.TotalAmount:N2} - Due: {invoice.DueDate:MMM dd, yyyy}",
+            icon: Icons.FileText,
+            badge: invoice.Status,
+            onClick: _ => blades.Push(this, new InvoiceDetailBlade(invoice.Id), $"Invoice {invoice.InvoiceNumber}")
+        ));
+        
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(12)
+                .Add(new Button("Create Invoice", _ => client.Toast("Create invoice"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)),
+            invoices.Count == 0 
+                ? "No invoices found. Create your first invoice!"
+                : new List(listItems)
+        );
+    }
+}
+
+public class InvoiceDetailBlade(int invoiceId) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var invoice = context.Invoices.Include(i => i.Payments).FirstOrDefault(i => i.Id == invoiceId);
+        
+        if (invoice == null)
+            return "Invoice not found";
+        
         return new Card(
             Layout.Vertical()
                 .Gap(16)
                 .Padding(16)
+                .Add($"Invoice #{invoice.InvoiceNumber}")
+                .Add(Layout.Vertical()
+                    .Gap(8)
+                    .Add($"Customer: {invoice.CustomerName}")
+                    .Add($"Email: {invoice.CustomerEmail}")
+                    .Add($"Issue Date: {invoice.IssueDate:MMM dd, yyyy}")
+                    .Add($"Due Date: {invoice.DueDate:MMM dd, yyyy}")
+                    .Add($"Amount: ${invoice.Amount:N2}")
+                    .Add($"Tax: ${invoice.TaxAmount:N2}")
+                    .Add($"Total: ${invoice.TotalAmount:N2}")
+                    .Add(new Badge(invoice.Status)
+                        .Variant(invoice.Status == "Paid" ? BadgeVariant.Success :
+                               invoice.Status == "Overdue" ? BadgeVariant.Destructive :
+                               BadgeVariant.Secondary)))
+                .Add("Description")
+                .Add(invoice.Description)
                 .Add(Layout.Horizontal()
                     .Gap(12)
-                    .Add("Invoices")
-                    .Add(new Button("Create Invoice", _ => client.Toast("Invoice creation coming soon!"))
-                        .Icon(Icons.Plus)
+                    .Add(new Button("Edit", _ => client.Toast("Edit invoice"))
                         .Variant(ButtonVariant.Primary))
-                )
-                .Add(invoices.Count == 0 
-                    ? "No invoices found. Create your first invoice!"
-                    : BuildInvoicesList(invoices, client))
+                    .Add(new Button("Send", _ => client.Toast("Send invoice"))
+                        .Variant(ButtonVariant.Secondary))
+                    .Add(invoice.Status != "Paid" 
+                        ? new Button("Mark Paid", _ => client.Toast("Mark as paid"))
+                            .Variant(ButtonVariant.Success)
+                        : null))
         );
     }
+}
 
-    private object BuildAccountsView(ApplicationDbContext context, IClientProvider client)
+public class AccountsBlade : ViewBase
+{
+    public override object? Build()
     {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
         var accounts = context.Accounts.OrderBy(a => a.AccountNumber).ToList();
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add("Chart of Accounts")
-                    .Add(new Button("Add Account", _ => client.Toast("Account creation coming soon!"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary))
-                )
-                .Add(accounts.Count == 0 
-                    ? "No accounts found. Add your first account!"
-                    : BuildAccountsList(accounts, client))
+        var listItems = accounts.Select(account => new ListItem(
+            title: $"{account.AccountNumber} - {account.AccountName}",
+            subtitle: $"{account.AccountType} - Balance: ${account.Balance:N2}",
+            icon: Icons.Book,
+            badge: account.IsActive ? "Active" : "Inactive",
+            onClick: _ => blades.Push(this, new AccountDetailBlade(account.Id), account.AccountName)
+        ));
+        
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(12)
+                .Add(new Button("Add Account", _ => client.Toast("Add account"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)),
+            accounts.Count == 0 
+                ? "No accounts found. Add your first account!"
+                : new List(listItems)
         );
     }
+}
 
-    private object BuildTransactionsView(ApplicationDbContext context, IClientProvider client)
+public class AccountDetailBlade(int accountId) : ViewBase
+{
+    public override object? Build()
     {
-        var transactions = context.Transactions.OrderByDescending(t => t.TransactionDate).ToList();
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var account = context.Accounts.FirstOrDefault(a => a.Id == accountId);
+        
+        if (account == null)
+            return "Account not found";
         
         return new Card(
             Layout.Vertical()
                 .Gap(16)
                 .Padding(16)
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add("Transactions")
-                    .Add(new Button("Add Transaction", _ => client.Toast("Transaction creation coming soon!"))
-                        .Icon(Icons.Plus)
-                        .Variant(ButtonVariant.Primary))
-                )
-                .Add(transactions.Count == 0 
-                    ? "No transactions found. Add your first transaction!"
-                    : BuildTransactionsList(transactions, client))
-        );
-    }
-
-    private object BuildInvoicesList(List<Invoice> invoices, IClientProvider client)
-    {
-        var invoiceCards = invoices.Select(invoice => new Card(
-            Layout.Horizontal()
-                .Gap(12)
-                .Padding(12)
+                .Add($"{account.AccountNumber} - {account.AccountName}")
                 .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"#{invoice.InvoiceNumber}")
-                    .Add(invoice.CustomerName)
-                    .Add(invoice.IssueDate.ToString("MMM dd, yyyy")))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"${invoice.TotalAmount:N2}")
-                    .Add(new Badge(invoice.Status)
-                        .Variant(invoice.Status == "Paid" ? BadgeVariant.Success : 
-                               invoice.Status == "Overdue" ? BadgeVariant.Destructive : 
-                               BadgeVariant.Secondary)))
-                .Add(new Button("View", _ => client.Toast($"Viewing invoice {invoice.InvoiceNumber}"))
-                    .Small()
-                    .Variant(ButtonVariant.Outline))
-        ));
-
-        return Layout.Vertical().Gap(8).Add(invoiceCards);
-    }
-
-    private object BuildAccountsList(List<Account> accounts, IClientProvider client)
-    {
-        var accountCards = accounts.Select(account => new Card(
-            Layout.Horizontal()
-                .Gap(12)
-                .Padding(12)
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"{account.AccountNumber} - {account.AccountName}")
-                    .Add(account.AccountType)
-                    .Add(account.Description))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"${account.Balance:N2}")
+                    .Gap(8)
+                    .Add($"Type: {account.AccountType}")
+                    .Add($"Balance: ${account.Balance:N2}")
+                    .Add($"Description: {account.Description}")
                     .Add(new Badge(account.IsActive ? "Active" : "Inactive")
                         .Variant(account.IsActive ? BadgeVariant.Success : BadgeVariant.Secondary)))
-                .Add(new Button("Edit", _ => client.Toast($"Editing account {account.AccountNumber}"))
-                    .Small()
-                    .Variant(ButtonVariant.Outline))
-        ));
-
-        return Layout.Vertical().Gap(8).Add(accountCards);
+                .Add(Layout.Horizontal()
+                    .Gap(12)
+                    .Add(new Button("Edit", _ => client.Toast("Edit account"))
+                        .Variant(ButtonVariant.Primary))
+                    .Add(new Button(account.IsActive ? "Deactivate" : "Activate", _ => client.Toast("Toggle status"))
+                        .Variant(account.IsActive ? ButtonVariant.Destructive : ButtonVariant.Success)))
+        );
     }
+}
 
-    private object BuildTransactionsList(List<Transaction> transactions, IClientProvider client)
+public class TransactionsBlade : ViewBase
+{
+    public override object? Build()
     {
-        var transactionCards = transactions.Select(transaction => new Card(
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
+        var transactions = context.Transactions.OrderByDescending(t => t.TransactionDate).ToList();
+        
+        var listItems = transactions.Select(transaction => new ListItem(
+            title: $"#{transaction.TransactionNumber}",
+            subtitle: $"{transaction.Description} - {transaction.TransactionDate:MMM dd, yyyy}",
+            icon: Icons.ArrowLeftRight,
+            badge: transaction.DebitAmount > 0 ? $"${transaction.DebitAmount:N2} DR" : $"${transaction.CreditAmount:N2} CR",
+            onClick: _ => blades.Push(this, new TransactionDetailBlade(transaction.Id), transaction.TransactionNumber)
+        ));
+        
+        return BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(12)
-                .Padding(12)
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add($"#{transaction.TransactionNumber}")
-                    .Add(transaction.Description)
-                    .Add(transaction.TransactionDate.ToString("MMM dd, yyyy")))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(transaction.DebitAmount > 0 ? $"Debit: ${transaction.DebitAmount:N2}" : "")
-                    .Add(transaction.CreditAmount > 0 ? $"Credit: ${transaction.CreditAmount:N2}" : ""))
-                .Add(new Button("View", _ => client.Toast($"Viewing transaction {transaction.TransactionNumber}"))
-                    .Small()
-                    .Variant(ButtonVariant.Outline))
-        ));
+                .Add(new Button("Add Transaction", _ => client.Toast("Add transaction"))
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)),
+            transactions.Count == 0 
+                ? "No transactions found. Add your first transaction!"
+                : new List(listItems)
+        );
+    }
+}
 
-        return Layout.Vertical().Gap(8).Add(transactionCards);
+public class TransactionDetailBlade(int transactionId) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var transaction = context.Transactions.FirstOrDefault(t => t.Id == transactionId);
+        
+        if (transaction == null)
+            return "Transaction not found";
+        
+        return new Card(
+            Layout.Vertical()
+                .Gap(16)
+                .Padding(16)
+                .Add($"Transaction #{transaction.TransactionNumber}")
+                .Add(Layout.Vertical()
+                    .Gap(8)
+                    .Add($"Date: {transaction.TransactionDate:MMM dd, yyyy}")
+                    .Add($"Description: {transaction.Description}")
+                    .Add($"Debit: ${transaction.DebitAmount:N2}")
+                    .Add($"Credit: ${transaction.CreditAmount:N2}")
+                    .Add($"Reference: {transaction.Reference}"))
+                .Add(new Button("Edit", _ => client.Toast("Edit transaction"))
+                    .Variant(ButtonVariant.Primary))
+        );
     }
 }
