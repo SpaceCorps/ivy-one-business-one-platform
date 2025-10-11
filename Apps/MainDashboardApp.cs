@@ -33,18 +33,18 @@ public class MainDashboardApp : ViewBase
 
     public override object? Build()
     {
+        var client = this.UseService<IClientProvider>();
+        
         return new Card(
             Layout.Grid()
                 .Columns(6)
-                .Gap(16)
-                .Padding(24)
+                .Gap(4)
                 | AppList.Select(app => new Card(
                     Layout.Vertical()
-                        .Gap(12)
-                        .Padding(16)
+                        .Gap(4)
                         .Add(new Icon(app.Icon))
                         .Add(app.Name)
-                ))
+                ).HandleClick(_ => client.OpenUrl($"/{app.Name}")))
         );
     }
 
