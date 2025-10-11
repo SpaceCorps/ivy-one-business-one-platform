@@ -403,6 +403,63 @@ public class DashboardBlade : ViewBase
         var overdueInvoices = invoices.Where(i => i.Status == "Overdue").Sum(i => i.TotalAmount);
         var totalExpenses = transactions.Where(t => t.DebitAmount > 0).Sum(t => t.DebitAmount);
 
+        // Monthly revenue trend data
+        var monthlyRevenue = invoices
+            .Where(i => i.Status == "Paid" && i.IssueDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(i => new { i.IssueDate.Year, i.IssueDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Revenue = g.Sum(i => i.TotalAmount) 
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Invoice status distribution
+        var invoiceStatusData = invoices
+            .GroupBy(i => i.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToArray();
+
+        // Monthly expense trend
+        var monthlyExpenses = transactions
+            .Where(t => t.DebitAmount > 0 && t.TransactionDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Expenses = g.Sum(t => t.DebitAmount) 
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Top customers by revenue
+        var topCustomers = invoices
+            .Where(i => i.Status == "Paid")
+            .GroupBy(i => i.CustomerName)
+            .Select(g => new { Customer = g.Key, Revenue = g.Sum(i => i.TotalAmount) })
+            .OrderByDescending(x => x.Revenue)
+            .Take(8)
+            .ToArray();
+
+        // Daily revenue (last 30 days)
+        var dailyRevenue = invoices
+            .Where(i => i.Status == "Paid" && i.IssueDate >= DateTime.UtcNow.AddDays(-30))
+            .GroupBy(i => i.IssueDate.Date)
+            .Select(g => new { 
+                Date = g.Key.ToString("MMM dd"), 
+                Revenue = g.Sum(i => i.TotalAmount) 
+            })
+            .OrderBy(x => x.Date)
+            .ToArray();
+
+        // Expense categories
+        var expenseCategories = transactions
+            .Where(t => t.DebitAmount > 0)
+            .GroupBy(t => t.Description.Split(' ')[0]) // First word as category
+            .Select(g => new { Category = g.Key, Amount = g.Sum(t => t.DebitAmount) })
+            .OrderByDescending(x => x.Amount)
+            .Take(10)
+            .ToArray();
+
         return Layout.Vertical()
             .Gap(3)
             .Add(Layout.Grid()
@@ -445,6 +502,54 @@ public class DashboardBlade : ViewBase
                         .Add(Text.H2($"${totalExpenses:N0}"))
                         .Add(Text.Small("Business expenses")))))
             .Add(new Card(
+                monthlyRevenue.Length > 0
+                    ? monthlyRevenue.ToLineChart(style: LineChartStyles.Dashboard)
+                        .Dimension("Month", e => e.Month)
+                        .Measure("Revenue", e => e.Sum(f => f.Revenue))
+                    : Text.Small("No revenue data")
+            ).Title("Revenue Trend (12 months)"))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Card(
+                    invoiceStatusData.Length > 0
+                        ? invoiceStatusData.ToPieChart(
+                            e => e.Status,
+                            e => e.Sum(f => f.Count),
+                            PieChartStyles.Donut
+                        )
+                        : Text.Small("No invoice data")
+                ).Title("Invoice Status Distribution"))
+                .Add(new Card(
+                    monthlyExpenses.Length > 0
+                        ? monthlyExpenses.ToBarChart()
+                            .Dimension("Month", e => e.Month)
+                            .Measure("Expenses", e => e.Sum(f => f.Expenses))
+                        : Text.Small("No expense data")
+                ).Title("Monthly Expenses")))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Card(
+                    topCustomers.Length > 0
+                        ? topCustomers.ToBarChart()
+                            .Dimension("Customer", e => e.Customer)
+                            .Measure("Revenue", e => e.Sum(f => f.Revenue))
+                        : Text.Small("No customer data")
+                ).Title("Top Customers by Revenue"))
+                .Add(new Card(
+                    dailyRevenue.Length > 0
+                        ? dailyRevenue.ToLineChart(style: LineChartStyles.Dashboard)
+                            .Dimension("Date", e => e.Date)
+                            .Measure("Revenue", e => e.Sum(f => f.Revenue))
+                        : Text.Small("No daily data")
+                ).Title("Daily Revenue (30 days)")))
+            .Add(new Card(
+                expenseCategories.Length > 0
+                    ? expenseCategories.ToBarChart()
+                        .Dimension("Category", e => e.Category)
+                        .Measure("Amount", e => e.Sum(f => f.Amount))
+                    : Text.Small("No expense data")
+            ).Title("Top Expense Categories"))
+            .Add(new Card(
                 invoices.Count > 0
                     ? new List(invoices.Take(10).Select(inv => new ListItem(
                         title: $"#{inv.InvoiceNumber} - {inv.CustomerName}",
@@ -479,7 +584,8 @@ public class InvoicesBlade : ViewBase
             }
         }, [refreshToken]);
 
-        var invoices = db.Invoices
+        var allInvoices = db.Invoices.ToList();
+        var invoices = allInvoices
             .Where(i => searchQuery.Value == "" ||
                        i.InvoiceNumber.Contains(searchQuery.Value) ||
                        i.CustomerName.Contains(searchQuery.Value))
@@ -501,6 +607,66 @@ public class InvoicesBlade : ViewBase
             tag: invoice.Id
         ));
 
+        // Invoice status distribution
+        var invoiceStatusData = allInvoices
+            .GroupBy(i => i.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToArray();
+
+        // Monthly invoice amounts
+        var monthlyInvoices = allInvoices
+            .Where(i => i.IssueDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(i => new { i.IssueDate.Year, i.IssueDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Amount = g.Sum(i => i.TotalAmount),
+                Count = g.Count()
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Top customers by invoice amount
+        var topCustomers = allInvoices
+            .GroupBy(i => i.CustomerName)
+            .Select(g => new { Customer = g.Key, Amount = g.Sum(i => i.TotalAmount) })
+            .OrderByDescending(x => x.Amount)
+            .Take(8)
+            .ToArray();
+
+        // Invoice amounts by status
+        var invoiceAmountsByStatus = allInvoices
+            .GroupBy(i => i.Status)
+            .Select(g => new { Status = g.Key, Amount = g.Sum(i => i.TotalAmount) })
+            .ToArray();
+
+        // Average invoice amount by month
+        var avgInvoiceAmounts = allInvoices
+            .Where(i => i.IssueDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(i => new { i.IssueDate.Year, i.IssueDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                AvgAmount = g.Average(i => i.TotalAmount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Payment timing analysis
+        var paymentTiming = allInvoices
+            .Where(i => i.Status == "Paid")
+            .Select(i => new { 
+                DaysToPay = (i.UpdatedAt - i.IssueDate).Days,
+                Amount = i.TotalAmount 
+            })
+            .GroupBy(i => i.DaysToPay / 10 * 10) // Group by 10-day intervals
+            .Select(g => new { 
+                DaysRange = $"{g.Key}-{g.Key + 9} days", 
+                Count = g.Count(),
+                AvgAmount = g.Average(i => i.Amount)
+            })
+            .OrderBy(x => x.DaysRange)
+            .Take(8)
+            .ToArray();
+
         var createButton = new Button(icon: Icons.Plus, variant: ButtonVariant.Outline).WithSheet(
             () => new CreateInvoiceSheet(refreshToken),
             title: "Create New Invoice",
@@ -518,20 +684,81 @@ public class InvoicesBlade : ViewBase
                 width: Size.Fraction(1 / 2f)
             );
 
+        object content;
+        
+        if (invoices.Count > 0)
+        {
+            content = Layout.Vertical()
+                .Gap(3)
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        invoiceStatusData.Length > 0
+                            ? invoiceStatusData.ToPieChart(
+                                e => e.Status,
+                                e => e.Sum(f => f.Count),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Invoice Status Distribution"))
+                    .Add(new Card(
+                        monthlyInvoices.Length > 0
+                            ? monthlyInvoices.ToLineChart(style: LineChartStyles.Dashboard)
+                                .Dimension("Month", e => e.Month)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Monthly Invoice Amounts")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        topCustomers.Length > 0
+                            ? topCustomers.ToBarChart()
+                                .Dimension("Customer", e => e.Customer)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Top Customers by Invoice Amount"))
+                    .Add(new Card(
+                        invoiceAmountsByStatus.Length > 0
+                            ? invoiceAmountsByStatus.ToBarChart()
+                                .Dimension("Status", e => e.Status)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Invoice Amounts by Status")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        avgInvoiceAmounts.Length > 0
+                            ? avgInvoiceAmounts.ToLineChart(style: LineChartStyles.Dashboard)
+                                .Dimension("Month", e => e.Month)
+                                .Measure("AvgAmount", e => e.Sum(f => f.AvgAmount))
+                            : Text.Small("No data")
+                    ).Title("Average Invoice Amount by Month"))
+                    .Add(new Card(
+                        paymentTiming.Length > 0
+                            ? paymentTiming.ToBarChart()
+                                .Dimension("DaysRange", e => e.DaysRange)
+                                .Measure("Count", e => e.Sum(f => f.Count))
+                            : Text.Small("No data")
+                    ).Title("Payment Timing Analysis")))
+                .Add(new List(items));
+        }
+        else
+        {
+            content = new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Padding(4)
+                    .Add(Text.H4("No invoices found"))
+                    .Add(Text.P("Create your first invoice to get started"))
+                    .Add(createButtonFull));
+        }
+
         return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(2)
+                        .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search invoices..."))
                 .Add(createButton),
-            invoices.Count > 0
-                ? new List(items)
-                : new Card(
-                    Layout.Vertical()
-                        .Gap(2)
-                        .Padding(4)
-                        .Add(Text.H4("No invoices found"))
-                        .Add(Text.P("Create your first invoice to get started"))
-                        .Add(createButtonFull))
+            content
         );
     }
 }
@@ -796,7 +1023,7 @@ public class EditInvoiceSheet : ViewBase
                     ))
             ).Title("Invoice Information"))
                     .Add(Layout.Horizontal()
-                .Gap(2)
+                        .Gap(2)
                 .Add(new Button("Save Changes").Variant(ButtonVariant.Primary).HandleClick(onSave)));
     }
 }
@@ -809,7 +1036,8 @@ public class PaymentsBlade : ViewBase
         var db = this.UseService<ApplicationDbContext>();
         var searchQuery = this.UseState("");
 
-        var payments = db.Payments
+        var allPayments = db.Payments.ToList();
+        var payments = allPayments
             .Where(p => searchQuery.Value == "" ||
                        p.Reference.Contains(searchQuery.Value))
             .OrderByDescending(p => p.PaymentDate)
@@ -820,19 +1048,151 @@ public class PaymentsBlade : ViewBase
             subtitle: $"${payment.Amount:N2} - {payment.PaymentDate:MMM dd, yyyy}"
         ));
 
+        // Payment method distribution
+        var paymentMethodData = allPayments
+            .GroupBy(p => p.PaymentMethod)
+            .Select(g => new { Method = g.Key, Amount = g.Sum(p => p.Amount) })
+            .ToArray();
+
+        // Monthly payment amounts
+        var monthlyPayments = allPayments
+            .Where(p => p.PaymentDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(p => new { p.PaymentDate.Year, p.PaymentDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Amount = g.Sum(p => p.Amount),
+                Count = g.Count()
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Daily payment amounts (last 30 days)
+        var dailyPayments = allPayments
+            .Where(p => p.PaymentDate >= DateTime.UtcNow.AddDays(-30))
+            .GroupBy(p => p.PaymentDate.Date)
+            .Select(g => new { 
+                Date = g.Key.ToString("MMM dd"), 
+                Amount = g.Sum(p => p.Amount),
+                Count = g.Count()
+            })
+            .OrderBy(x => x.Date)
+            .ToArray();
+
+        // Payment amount ranges
+        var paymentRanges = allPayments
+            .Select(p => new { 
+                Range = p.Amount switch {
+                    < 100 => "< $100",
+                    < 500 => "$100-$500",
+                    < 1000 => "$500-$1000",
+                    < 5000 => "$1000-$5000",
+                    _ => ">$5000"
+                },
+                Amount = p.Amount
+            })
+            .GroupBy(p => p.Range)
+            .Select(g => new { Range = g.Key, Count = g.Count(), Amount = g.Sum(p => p.Amount) })
+            .OrderBy(x => x.Range)
+            .ToArray();
+
+        // Average payment amount by method
+        var avgPaymentByMethod = allPayments
+            .GroupBy(p => p.PaymentMethod)
+            .Select(g => new { 
+                Method = g.Key, 
+                AvgAmount = g.Average(p => p.Amount),
+                Count = g.Count()
+            })
+            .OrderByDescending(x => x.AvgAmount)
+            .ToArray();
+
+        // Payment frequency by day of week
+        var paymentByDayOfWeek = allPayments
+            .GroupBy(p => p.PaymentDate.DayOfWeek)
+            .Select(g => new { 
+                Day = g.Key.ToString(), 
+                Count = g.Count(),
+                Amount = g.Sum(p => p.Amount)
+            })
+            .OrderBy(x => x.Day)
+            .ToArray();
+
+        object content;
+        
+        if (payments.Count > 0)
+        {
+            content = Layout.Vertical()
+                .Gap(3)
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        paymentMethodData.Length > 0
+                            ? paymentMethodData.ToPieChart(
+                                e => e.Method,
+                                e => e.Sum(f => f.Amount),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Payment Methods Distribution"))
+                    .Add(new Card(
+                        monthlyPayments.Length > 0
+                            ? monthlyPayments.ToLineChart(style: LineChartStyles.Dashboard)
+                                .Dimension("Month", e => e.Month)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Monthly Payment Amounts")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        dailyPayments.Length > 0
+                            ? dailyPayments.ToBarChart()
+                                .Dimension("Date", e => e.Date)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Daily Payments (30 days)"))
+                    .Add(new Card(
+                        paymentRanges.Length > 0
+                            ? paymentRanges.ToPieChart(
+                                e => e.Range,
+                                e => e.Sum(f => f.Count),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Payment Amount Ranges")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        avgPaymentByMethod.Length > 0
+                            ? avgPaymentByMethod.ToBarChart()
+                                .Dimension("Method", e => e.Method)
+                                .Measure("AvgAmount", e => e.Sum(f => f.AvgAmount))
+                            : Text.Small("No data")
+                    ).Title("Average Payment by Method"))
+                    .Add(new Card(
+                        paymentByDayOfWeek.Length > 0
+                            ? paymentByDayOfWeek.ToBarChart()
+                                .Dimension("Day", e => e.Day)
+                                .Measure("Count", e => e.Sum(f => f.Count))
+                            : Text.Small("No data")
+                    ).Title("Payment Frequency by Day of Week")))
+                .Add(new List(items));
+        }
+        else
+        {
+            content = new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Padding(4)
+                    .Add(Text.H4("No payments found"))
+                    .Add(Text.P("Record your first payment to get started")));
+        }
+
         return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(2)
+                        .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search payments..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            payments.Count > 0
-                ? new List(items)
-                : new Card(
-                    Layout.Vertical()
-                        .Gap(2)
-                        .Padding(4)
-                        .Add(Text.H4("No payments found"))
-                        .Add(Text.P("Record your first payment to get started")))
+            content
         );
     }
 }
@@ -846,7 +1206,8 @@ public class AccountsBlade : ViewBase
         var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
 
-        var accounts = db.Accounts
+        var allAccounts = db.Accounts.ToList();
+        var accounts = allAccounts
             .Where(a => searchQuery.Value == "" ||
                        a.AccountName.Contains(searchQuery.Value) ||
                        a.AccountNumber.Contains(searchQuery.Value))
@@ -867,19 +1228,137 @@ public class AccountsBlade : ViewBase
             tag: account.Id
         ));
 
+        // Group accounts by type for charts
+        var accountsByType = allAccounts
+            .GroupBy(a => a.AccountType)
+            .Select(g => new { Type = g.Key, Balance = g.Sum(a => a.Balance) })
+            .Where(x => x.Balance > 0)
+            .ToArray();
+
+        // Top accounts by balance
+        var topAccounts = allAccounts
+            .Where(a => a.Balance > 0)
+            .OrderByDescending(a => a.Balance)
+            .Take(10)
+            .Select(a => new { Account = a.AccountName, Balance = a.Balance })
+            .ToArray();
+
+        // Account balance ranges
+        var balanceRanges = allAccounts
+            .Select(a => new { 
+                Range = a.Balance switch {
+                    < 0 => "Negative",
+                    < 1000 => "$0-$1K",
+                    < 10000 => "$1K-$10K",
+                    < 50000 => "$10K-$50K",
+                    < 100000 => "$50K-$100K",
+                    _ => ">$100K"
+                },
+                Balance = a.Balance
+            })
+            .GroupBy(a => a.Range)
+            .Select(g => new { Range = g.Key, Count = g.Count(), Balance = g.Sum(a => a.Balance) })
+            .OrderBy(x => x.Range)
+            .ToArray();
+
+        // Assets vs Liabilities vs Equity
+        var balanceSheetData = allAccounts
+            .GroupBy(a => a.AccountType)
+            .Select(g => new { Type = g.Key, Balance = g.Sum(a => a.Balance) })
+            .ToArray();
+
+        // Account distribution by type
+        var accountCountByType = allAccounts
+            .GroupBy(a => a.AccountType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToArray();
+
+        // Largest positive and negative balances
+        var extremeBalances = new[]
+        {
+            allAccounts.Where(a => a.Balance > 0).OrderByDescending(a => a.Balance).FirstOrDefault(),
+            allAccounts.Where(a => a.Balance < 0).OrderBy(a => a.Balance).FirstOrDefault()
+        }
+        .Where(a => a != null)
+        .Select(a => new { Account = a!.AccountName, Balance = a.Balance })
+        .ToArray();
+
+        object content;
+        
+        if (accounts.Count > 0)
+        {
+            content = Layout.Vertical()
+                .Gap(3)
+                    .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        accountsByType.Length > 0
+                            ? accountsByType.ToPieChart(
+                                e => e.Type,
+                                e => e.Sum(f => f.Balance),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Balance by Account Type"))
+                    .Add(new Card(
+                        topAccounts.Length > 0
+                            ? topAccounts.ToBarChart()
+                                .Dimension("Account", e => e.Account)
+                                .Measure("Balance", e => e.Sum(f => f.Balance))
+                            : Text.Small("No data")
+                    ).Title("Top Accounts by Balance")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        balanceRanges.Length > 0
+                            ? balanceRanges.ToPieChart(
+                                e => e.Range,
+                                e => e.Sum(f => f.Count),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Account Balance Ranges"))
+                    .Add(new Card(
+                        balanceSheetData.Length > 0
+                            ? balanceSheetData.ToBarChart()
+                                .Dimension("Type", e => e.Type)
+                                .Measure("Balance", e => e.Sum(f => f.Balance))
+                            : Text.Small("No data")
+                    ).Title("Balance Sheet Overview")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        accountCountByType.Length > 0
+                            ? accountCountByType.ToBarChart()
+                                .Dimension("Type", e => e.Type)
+                                .Measure("Count", e => e.Sum(f => f.Count))
+                            : Text.Small("No data")
+                    ).Title("Account Count by Type"))
+                    .Add(new Card(
+                        extremeBalances.Length > 0
+                            ? extremeBalances.ToBarChart()
+                                .Dimension("Account", e => e.Account)
+                                .Measure("Balance", e => e.Sum(f => f.Balance))
+                            : Text.Small("No data")
+                    ).Title("Extreme Balances")))
+                .Add(new List(items));
+        }
+        else
+        {
+            content = new Card(
+                Layout.Vertical()
+                        .Gap(2)
+                    .Padding(4)
+                    .Add(Text.H4("No accounts found"))
+                    .Add(Text.P("Create your chart of accounts to get started")));
+        }
+
         return BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search accounts..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            accounts.Count > 0
-                ? new List(items)
-                : new Card(
-                    Layout.Vertical()
-                        .Gap(2)
-                        .Padding(4)
-                        .Add(Text.H4("No accounts found"))
-                        .Add(Text.P("Create your chart of accounts to get started")))
+            content
         );
     }
 }
@@ -942,7 +1421,8 @@ public class TransactionsBlade : ViewBase
         var db = this.UseService<ApplicationDbContext>();
         var searchQuery = this.UseState("");
 
-        var transactions = db.Transactions
+        var allTransactions = db.Transactions.ToList();
+        var transactions = allTransactions
             .Where(t => searchQuery.Value == "" || t.Description.Contains(searchQuery.Value))
             .OrderByDescending(t => t.TransactionDate)
             .ToList();
@@ -952,19 +1432,160 @@ public class TransactionsBlade : ViewBase
             subtitle: $"${trans.DebitAmount:N2} / ${trans.CreditAmount:N2} - {trans.TransactionDate:MMM dd, yyyy}"
         ));
 
+        // Monthly debit vs credit
+        var monthlyDebitCredit = allTransactions
+            .Where(t => t.TransactionDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Debit = g.Sum(t => t.DebitAmount),
+                Credit = g.Sum(t => t.CreditAmount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Transaction type distribution (debit vs credit)
+        var transactionTypeData = new[]
+        {
+            new { Type = "Debits", Amount = allTransactions.Sum(t => t.DebitAmount) },
+            new { Type = "Credits", Amount = allTransactions.Sum(t => t.CreditAmount) }
+        };
+
+        // Daily transaction volume (last 30 days)
+        var dailyTransactions = allTransactions
+            .Where(t => t.TransactionDate >= DateTime.UtcNow.AddDays(-30))
+            .GroupBy(t => t.TransactionDate.Date)
+            .Select(g => new { 
+                Date = g.Key.ToString("MMM dd"), 
+                Count = g.Count(),
+                Amount = g.Sum(t => t.DebitAmount + t.CreditAmount)
+            })
+            .OrderBy(x => x.Date)
+            .ToArray();
+
+        // Top transaction amounts
+        var topTransactions = allTransactions
+            .Where(t => (t.DebitAmount + t.CreditAmount) > 0)
+            .OrderByDescending(t => t.DebitAmount + t.CreditAmount)
+            .Take(10)
+            .Select(t => new { 
+                Description = t.Description.Length > 30 ? t.Description.Substring(0, 30) + "..." : t.Description,
+                Amount = t.DebitAmount + t.CreditAmount
+            })
+            .ToArray();
+
+        // Transaction categories
+        var transactionCategories = allTransactions
+            .GroupBy(t => t.Description.Split(' ')[0]) // First word as category
+            .Select(g => new { Category = g.Key, Count = g.Count(), Amount = g.Sum(t => t.DebitAmount + t.CreditAmount) })
+            .OrderByDescending(x => x.Amount)
+            .Take(10)
+            .ToArray();
+
+        // Net cash flow by month
+        var monthlyCashFlow = allTransactions
+            .Where(t => t.TransactionDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                NetFlow = g.Sum(t => t.CreditAmount - t.DebitAmount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Transaction frequency by day of week
+        var transactionByDayOfWeek = allTransactions
+            .GroupBy(t => t.TransactionDate.DayOfWeek)
+            .Select(g => new { 
+                Day = g.Key.ToString(), 
+                Count = g.Count(),
+                Amount = g.Sum(t => t.DebitAmount + t.CreditAmount)
+            })
+            .OrderBy(x => x.Day)
+            .ToArray();
+
+        object content;
+        
+        if (transactions.Count > 0)
+        {
+            content = Layout.Vertical()
+                .Gap(3)
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        transactionTypeData.Length > 0
+                            ? transactionTypeData.ToPieChart(
+                                e => e.Type,
+                                e => e.Sum(f => f.Amount),
+                                PieChartStyles.Donut
+                            )
+                            : Text.Small("No data")
+                    ).Title("Debit vs Credit Distribution"))
+                    .Add(new Card(
+                        monthlyDebitCredit.Length > 0
+                            ? monthlyDebitCredit.ToLineChart(style: LineChartStyles.Dashboard)
+                                .Dimension("Month", e => e.Month)
+                                .Measure("Debit", e => e.Sum(f => f.Debit))
+                                .Measure("Credit", e => e.Sum(f => f.Credit))
+                            : Text.Small("No data")
+                    ).Title("Monthly Debit vs Credit")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        dailyTransactions.Length > 0
+                            ? dailyTransactions.ToBarChart()
+                                .Dimension("Date", e => e.Date)
+                                .Measure("Count", e => e.Sum(f => f.Count))
+                            : Text.Small("No data")
+                    ).Title("Daily Transaction Count (30 days)"))
+                    .Add(new Card(
+                        topTransactions.Length > 0
+                            ? topTransactions.ToBarChart()
+                                .Dimension("Description", e => e.Description)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Top Transactions by Amount")))
+                .Add(Layout.Horizontal()
+                    .Gap(3)
+                    .Add(new Card(
+                        transactionCategories.Length > 0
+                            ? transactionCategories.ToBarChart()
+                                .Dimension("Category", e => e.Category)
+                                .Measure("Amount", e => e.Sum(f => f.Amount))
+                            : Text.Small("No data")
+                    ).Title("Transaction Categories"))
+                    .Add(new Card(
+                        monthlyCashFlow.Length > 0
+                            ? monthlyCashFlow.ToLineChart(style: LineChartStyles.Dashboard)
+                                .Dimension("Month", e => e.Month)
+                                .Measure("NetFlow", e => e.Sum(f => f.NetFlow))
+                            : Text.Small("No data")
+                    ).Title("Monthly Cash Flow")))
+                .Add(new Card(
+                    transactionByDayOfWeek.Length > 0
+                        ? transactionByDayOfWeek.ToBarChart()
+                            .Dimension("Day", e => e.Day)
+                            .Measure("Count", e => e.Sum(f => f.Count))
+                        : Text.Small("No data")
+                ).Title("Transaction Frequency by Day of Week"))
+                .Add(new List(items));
+        }
+        else
+        {
+            content = new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Padding(4)
+                    .Add(Text.H4("No transactions found"))
+                    .Add(Text.P("Your financial activity will appear here")));
+        }
+
         return BladeHelper.WithHeader(
                 Layout.Horizontal()
                     .Gap(2)
                 .Add(searchQuery.ToTextInput().Placeholder("Search transactions..."))
                 .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
-            transactions.Count > 0
-                ? new List(items)
-                        : new Card(
-                            Layout.Vertical()
-                                .Gap(2)
-                                .Padding(4)
-                        .Add(Text.H4("No transactions found"))
-                        .Add(Text.P("Your financial activity will appear here")))
+            content
         );
     }
 }
@@ -974,35 +1595,211 @@ public class ReportsBlade : ViewBase
 {
     public override object? Build()
     {
-        var reportTypes = new[]
-        {
-            new ListItem(
-                icon: Icons.FileText,
-                title: "Profit & Loss",
-                subtitle: "Income statement for the period"
-            ),
-            new ListItem(
-                icon: Icons.Activity,
-                title: "Balance Sheet",
-                subtitle: "Assets, liabilities, and equity"
-            ),
-            new ListItem(
-                icon: Icons.TrendingUp,
-                title: "Cash Flow",
-                subtitle: "Cash movement analysis"
-            ),
-            new ListItem(
-                icon: Icons.Circle,
-                title: "Aged Receivables",
-                subtitle: "Outstanding customer invoices"
-            ),
-            new ListItem(
-                icon: Icons.Activity,
-                title: "Aged Payables",
-                subtitle: "Outstanding vendor bills"
-            )
-        };
+        var db = this.UseService<ApplicationDbContext>();
 
-        return new List(reportTypes);
+        var invoices = db.Invoices.ToList();
+        var transactions = db.Transactions.ToList();
+        var accounts = db.Accounts.ToList();
+
+        // Profit & Loss data
+        var revenue = invoices.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount);
+        var expenses = transactions.Where(t => t.DebitAmount > 0).Sum(t => t.DebitAmount);
+        var netProfit = revenue - expenses;
+
+        // Balance Sheet data
+        var totalAssets = accounts.Where(a => a.AccountType == "Asset").Sum(a => a.Balance);
+        var totalLiabilities = accounts.Where(a => a.AccountType == "Liability").Sum(a => a.Balance);
+        var totalEquity = accounts.Where(a => a.AccountType == "Equity").Sum(a => a.Balance);
+
+        // Cash Flow data (simplified)
+        var cashInflows = invoices.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount);
+        var cashOutflows = transactions.Where(t => t.DebitAmount > 0).Sum(t => t.DebitAmount);
+        var netCashFlow = cashInflows - cashOutflows;
+
+        // Aged receivables
+        var agedReceivables = invoices
+            .Where(i => i.Status != "Paid")
+            .GroupBy(i => DateTime.UtcNow.Subtract(i.DueDate).Days switch
+            {
+                <= 0 => "Current",
+                <= 30 => "1-30 days",
+                <= 60 => "31-60 days",
+                <= 90 => "61-90 days",
+                _ => "Over 90 days"
+            })
+            .Select(g => new { Age = g.Key, Amount = g.Sum(i => i.TotalAmount) })
+            .ToArray();
+
+        // Monthly financial trends
+        var monthlyFinancials = invoices
+            .Where(i => i.IssueDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(i => new { i.IssueDate.Year, i.IssueDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Revenue = g.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount),
+                Invoiced = g.Sum(i => i.TotalAmount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        var monthlyExpenses = transactions
+            .Where(t => t.DebitAmount > 0 && t.TransactionDate >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Expenses = g.Sum(t => t.DebitAmount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+
+        // Profit margin by month
+        var monthlyProfitMargins = monthlyFinancials
+            .Join(monthlyExpenses, 
+                f => f.Month, 
+                e => e.Month, 
+                (f, e) => new { 
+                    Month = f.Month, 
+                    Revenue = f.Revenue, 
+                    Expenses = e.Expenses,
+                    Profit = f.Revenue - e.Expenses,
+                    Margin = f.Revenue > 0 ? ((f.Revenue - e.Expenses) / f.Revenue) * 100 : 0
+                })
+            .ToArray();
+
+        // Top expense categories
+        var expenseCategories = transactions
+            .Where(t => t.DebitAmount > 0)
+            .GroupBy(t => t.Description.Split(' ')[0])
+            .Select(g => new { Category = g.Key, Amount = g.Sum(t => t.DebitAmount) })
+            .OrderByDescending(x => x.Amount)
+            .Take(8)
+            .ToArray();
+
+        // Revenue by customer
+        var revenueByCustomer = invoices
+            .Where(i => i.Status == "Paid")
+            .GroupBy(i => i.CustomerName)
+            .Select(g => new { Customer = g.Key, Revenue = g.Sum(i => i.TotalAmount) })
+            .OrderByDescending(x => x.Revenue)
+            .Take(8)
+            .ToArray();
+
+        return Layout.Vertical()
+            .Gap(3)
+            .Add(Layout.Grid()
+                .Columns(3)
+                .Gap(3)
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Text.H3("Revenue"))
+                        .Add(Text.H2($"${revenue:N0}"))
+                        .Add(Text.Small("Total earned"))))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Text.H3("Expenses"))
+                        .Add(Text.H2($"${expenses:N0}"))
+                        .Add(Text.Small("Total spent"))))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Text.H3("Net Profit"))
+                        .Add(Text.H2($"${netProfit:N0}"))
+                        .Add(Text.Small(netProfit >= 0 ? "Profit" : "Loss")))))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Card(
+                    agedReceivables.Length > 0
+                        ? agedReceivables.ToPieChart(
+                            e => e.Age,
+                            e => e.Sum(f => f.Amount),
+                            PieChartStyles.Donut
+                        )
+                        : Text.Small("No aged receivables")
+                ).Title("Aged Receivables"))
+                .Add(new Card(
+                    monthlyFinancials.Length > 0
+                        ? monthlyFinancials.ToLineChart(style: LineChartStyles.Dashboard)
+                            .Dimension("Month", e => e.Month)
+                            .Measure("Revenue", e => e.Sum(f => f.Revenue))
+                            .Measure("Invoiced", e => e.Sum(f => f.Invoiced))
+                        : Text.Small("No financial data")
+                ).Title("Monthly Revenue Trends")))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Card(
+                    accounts.Count > 0
+                        ? new[]
+                        {
+                            new { Type = "Assets", Amount = totalAssets },
+                            new { Type = "Liabilities", Amount = totalLiabilities },
+                            new { Type = "Equity", Amount = totalEquity }
+                        }.ToBarChart()
+                            .Dimension("Type", e => e.Type)
+                            .Measure("Amount", e => e.Sum(f => f.Amount))
+                        : Text.Small("No account data")
+                ).Title("Balance Sheet Overview"))
+                .Add(new Card(
+                    monthlyExpenses.Length > 0
+                        ? monthlyExpenses.ToBarChart()
+                            .Dimension("Month", e => e.Month)
+                            .Measure("Expenses", e => e.Sum(f => f.Expenses))
+                        : Text.Small("No expense data")
+                ).Title("Monthly Expenses")))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Card(
+                    expenseCategories.Length > 0
+                        ? expenseCategories.ToPieChart(
+                            e => e.Category,
+                            e => e.Sum(f => f.Amount),
+                            PieChartStyles.Donut
+                        )
+                        : Text.Small("No expense data")
+                ).Title("Expense Categories"))
+                .Add(new Card(
+                    revenueByCustomer.Length > 0
+                        ? revenueByCustomer.ToBarChart()
+                            .Dimension("Customer", e => e.Customer)
+                            .Measure("Revenue", e => e.Sum(f => f.Revenue))
+                        : Text.Small("No customer data")
+                ).Title("Revenue by Customer")))
+            .Add(new Card(
+                monthlyProfitMargins.Length > 0
+                    ? monthlyProfitMargins.ToLineChart(style: LineChartStyles.Dashboard)
+                        .Dimension("Month", e => e.Month)
+                        .Measure("Profit", e => e.Sum(f => f.Profit))
+                        .Measure("Margin", e => e.Sum(f => f.Margin))
+                    : Text.Small("No profit data")
+            ).Title("Monthly Profit & Margins"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Text.H4("Financial Reports"))
+                    .Add(new List(new[]
+                    {
+                        new ListItem(
+                            icon: Icons.FileText,
+                            title: "Profit & Loss Statement",
+                            subtitle: $"Revenue: ${revenue:N0} | Expenses: ${expenses:N0} | Net: ${netProfit:N0}"
+                        ),
+                        new ListItem(
+                            icon: Icons.Activity,
+                            title: "Balance Sheet",
+                            subtitle: $"Assets: ${totalAssets:N0} | Liabilities: ${totalLiabilities:N0} | Equity: ${totalEquity:N0}"
+                        ),
+                        new ListItem(
+                            icon: Icons.TrendingUp,
+                            title: "Cash Flow Statement",
+                            subtitle: $"Inflows: ${cashInflows:N0} | Outflows: ${cashOutflows:N0} | Net: ${netCashFlow:N0}"
+                        ),
+                        new ListItem(
+                            icon: Icons.Circle,
+                            title: "Aged Receivables",
+                            subtitle: $"Total Outstanding: ${agedReceivables.Sum(a => a.Amount):N0}"
+                        )
+                    }))
+            ).Title("Quick Reports"));
     }
 }
