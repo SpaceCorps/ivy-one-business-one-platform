@@ -14,18 +14,86 @@ public class AccountingApp : ViewBase
 {
     public override object? Build()
     {
-        return new AccountingDashboard();
+        return this.UseBlades(() => new AccountingMenuBlade(), "Accounting");
     }
 }
 
-public class AccountingDashboard : ViewBase
+// Menu blade - shows list of accounting sections
+public class AccountingMenuBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var blades = this.UseContext<IBladeController>();
+        var db = this.UseService<ApplicationDbContext>();
+
+        var invoicesCount = db.Invoices.Count();
+        var accountsCount = db.Accounts.Count();
+        var transactionsCount = db.Transactions.Count();
+        var paymentsCount = db.Payments.Count();
+
+        Func<Event<ListItem>, ValueTask> onDashboardClick = e => { blades.Push(this, new DashboardBlade(), "Dashboard"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onInvoicesClick = e => { blades.Push(this, new InvoicesBlade(), "Invoices"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onPaymentsClick = e => { blades.Push(this, new PaymentsBlade(), "Payments"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onAccountsClick = e => { blades.Push(this, new AccountsBlade(), "Accounts"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onTransactionsClick = e => { blades.Push(this, new TransactionsBlade(), "Transactions"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onReportsClick = e => { blades.Push(this, new ReportsBlade(), "Reports"); return ValueTask.CompletedTask; };
+
+        var menuItems = new[]
+        {
+            new ListItem(
+                icon: Icons.TrendingUp,
+                title: "Dashboard",
+                subtitle: "Overview of your finances",
+                onClick: onDashboardClick
+            ),
+            new ListItem(
+                icon: Icons.FileText,
+                title: "Invoices",
+                subtitle: $"{invoicesCount} invoices",
+                badge: invoicesCount > 0 ? invoicesCount.ToString() : null,
+                onClick: onInvoicesClick
+            ),
+            new ListItem(
+                icon: Icons.Receipt,
+                title: "Payments",
+                subtitle: $"{paymentsCount} payments",
+                badge: paymentsCount > 0 ? paymentsCount.ToString() : null,
+                onClick: onPaymentsClick
+            ),
+            new ListItem(
+                icon: Icons.Book,
+                title: "Chart of Accounts",
+                subtitle: $"{accountsCount} accounts",
+                badge: accountsCount > 0 ? accountsCount.ToString() : null,
+                onClick: onAccountsClick
+            ),
+            new ListItem(
+                icon: Icons.List,
+                title: "Transactions",
+                subtitle: $"{transactionsCount} transactions",
+                badge: transactionsCount > 0 ? transactionsCount.ToString() : null,
+                onClick: onTransactionsClick
+            ),
+            new ListItem(
+                icon: Icons.TrendingUp,
+                title: "Reports",
+                subtitle: "Financial reports and analytics",
+                onClick: onReportsClick
+            )
+        };
+
+        return new List(menuItems);
+    }
+}
+
+// Dashboard blade - shows financial overview
+public class DashboardBlade : ViewBase
 {
     public override object? Build()
     {
         var db = this.UseService<ApplicationDbContext>();
 
         var invoices = db.Invoices.ToList();
-        var accounts = db.Accounts.ToList();
         var transactions = db.Transactions.ToList();
 
         var totalRevenue = invoices.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount);
@@ -33,245 +101,428 @@ public class AccountingDashboard : ViewBase
         var overdueInvoices = invoices.Where(i => i.Status == "Overdue").Sum(i => i.TotalAmount);
         var totalExpenses = transactions.Where(t => t.DebitAmount > 0).Sum(t => t.DebitAmount);
 
-        // Financial Overview KPI Cards
-        var kpiCards = new[]
-        {
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.TrendingUp.ToIcon())
-                        .Add(Text.Small("TOTAL REVENUE")))
-                    .Add(Text.H1($"${totalRevenue:N0}"))
-                    .Add(Text.Small("From paid invoices"))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.Clock.ToIcon())
-                        .Add(Text.Small("PENDING AMOUNT")))
-                    .Add(Text.H1($"${pendingInvoices:N0}"))
-                    .Add(Text.Small("Unpaid invoices"))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.X.ToIcon())
-                        .Add(Text.Small("OVERDUE")))
-                    .Add(Text.H1($"${overdueInvoices:N0}"))
-                    .Add(Text.Small("Late payments"))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.CreditCard.ToIcon())
-                        .Add(Text.Small("TOTAL EXPENSES")))
-                    .Add(Text.H1($"${totalExpenses:N0}"))
-                    .Add(Text.Small("Business expenses")))
-        };
-
-        // Quick Actions Section
-        var quickActions = new[]
-        {
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.FileText.ToIcon())
-                        .Add(Text.H4("Customer Invoices"))
-                        .Add(new Badge(invoices.Count.ToString())))
-                    .Add(Text.Small("Create and manage customer invoices"))
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(new Button("View All").Variant(ButtonVariant.Outline))
-                        .Add(new Button("Create New").Variant(ButtonVariant.Primary)))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.Receipt.ToIcon())
-                        .Add(Text.H4("Vendor Bills"))
-                        .Add(new Badge("New").Variant(BadgeVariant.Success)))
-                    .Add(Text.Small("Process supplier invoices and bills"))
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(new Button("View All").Variant(ButtonVariant.Outline))
-                        .Add(new Button("Create New").Variant(ButtonVariant.Primary)))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.Building.ToIcon())
-                        .Add(Text.H4("Bank Reconciliation"))
-                        .Add(new Badge("Smart").Variant(BadgeVariant.Success)))
-                    .Add(Text.Small("Match bank transactions automatically"))
-                    .Add(new Button("Reconcile Now").Variant(ButtonVariant.Primary).Width(Size.Full()))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.Book.ToIcon())
-                        .Add(Text.H4("Chart of Accounts"))
-                        .Add(new Badge(accounts.Count.ToString())))
-                    .Add(Text.Small("Manage your accounting structure"))
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(new Button("View All").Variant(ButtonVariant.Outline))
-                        .Add(new Button("Add Account").Variant(ButtonVariant.Primary)))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.CreditCard.ToIcon())
-                        .Add(Text.H4("Expenses"))
-                        .Add(new Badge("AI").Variant(BadgeVariant.Success)))
-                    .Add(Text.Small("Track and reimburse expenses"))
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(new Button("View All").Variant(ButtonVariant.Outline))
-                        .Add(new Button("Add Expense").Variant(ButtonVariant.Primary)))),
-
-            new Card(
-                Layout.Vertical()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Layout.Horizontal()
-                        .Gap(2)
-                        .Add(Icons.TrendingUp.ToIcon())
-                        .Add(Text.H4("Financial Reports"))
-                        .Add(new Badge("Live").Variant(BadgeVariant.Success)))
-                    .Add(Text.Small("Real-time financial performance"))
-                    .Add(new Button("Generate Report").Variant(ButtonVariant.Primary).Width(Size.Full())))
-        };
-
-        // Recent Activity Section
-        var recentInvoices = invoices.Take(5).Select(inv => new ListItem(
-            title: $"#{inv.InvoiceNumber} - {inv.CustomerName}",
-            subtitle: $"${inv.TotalAmount:N2} - Due: {inv.DueDate:MMM dd, yyyy}",
-            badge: inv.Status == "Paid" ? BadgeVariant.Success :
-                   inv.Status == "Overdue" ? BadgeVariant.Destructive :
-                   BadgeVariant.Secondary
-        ));
-
-        var recentTransactions = transactions.Take(5).Select(trans => new ListItem(
-            title: trans.Description,
-            subtitle: $"${trans.DebitAmount:N2} / ${trans.CreditAmount:N2} - {trans.TransactionDate:MMM dd, yyyy}",
-            badge: "Transaction"
-        ));
-
-        // AI Features Section
-        var aiFeatures = new[]
-        {
-            new Card(
-                Layout.Horizontal()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Icons.Bot.ToIcon())
-                    .Add(Layout.Vertical()
-                        .Gap(1)
-                        .Add(Text.Small("AI-Powered Matching"))
-                        .Add(Text.Small("95% automated bank reconciliation")))),
-            
-            new Card(
-                Layout.Horizontal()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Icons.Smartphone.ToIcon())
-                    .Add(Layout.Vertical()
-                        .Gap(1)
-                        .Add(Text.Small("Mobile Receipt Capture"))
-                        .Add(Text.Small("Scan receipts with your phone")))),
-            
-            new Card(
-                Layout.Horizontal()
-                    .Gap(2)
-                    .Padding(4)
-                    .Add(Icons.RefreshCw.ToIcon())
-                    .Add(Layout.Vertical()
-                        .Gap(1)
-                        .Add(Text.Small("Real-time Sync"))
-                        .Add(Text.Small("Always up-to-date data"))))
-        };
-
         return Layout.Vertical()
-            .Gap(4)
-            .Padding(4)
-            .Add(Layout.Horizontal()
-                .Gap(4)
-                .Add(Text.H2("Accounting Dashboard"))
-                .Add(new Button("📷 Scan Receipt")
-                    .Icon(Icons.Camera)
-                    .Variant(ButtonVariant.Primary))
-                .Add(new Button("⚡ Quick Invoice")
-                    .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Outline)))
-            .Add(Layout.Grid()
-                .Columns(4)
-                .Gap(4)
-                .Add(kpiCards))
-            .Add(Layout.Vertical()
-                .Gap(4)
-                .Add(Text.H3("Quick Actions"))
-                .Add(Layout.Grid()
-                    .Columns(3)
-                    .Gap(4)
-                    .Add(quickActions)))
+            .Gap(3)
             .Add(Layout.Grid()
                 .Columns(2)
-                .Gap(4)
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(Text.H3("Recent Invoices"))
-                    .Add(invoices.Count > 0 
-                        ? new List(recentInvoices)
-                        : new Card(
-                            Layout.Vertical()
-                                .Gap(2)
-                                .Padding(4)
-                                .Add(Text.H4("No invoices yet"))
-                                .Add(Text.P("Create your first invoice to get started")))))
-                .Add(Layout.Vertical()
-                    .Gap(4)
-                    .Add(Text.H3("Recent Transactions"))
-                    .Add(transactions.Count > 0 
-                        ? new List(recentTransactions)
-                        : new Card(
-                            Layout.Vertical()
-                                .Gap(2)
-                                .Padding(4)
-                                .Add(Text.H4("No transactions yet"))
-                                .Add(Text.P("Your financial activity will appear here"))))))
-            .Add(Layout.Vertical()
-                .Gap(4)
-                .Add(Text.H3("AI-Powered Features"))
-                .Add(Layout.Grid()
-                    .Columns(3)
-                    .Gap(4)
-                    .Add(aiFeatures)));
+                .Gap(3)
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Layout.Horizontal()
+                            .Gap(2)
+                            .Add(Icons.TrendingUp.ToIcon())
+                            .Add(Text.Small("TOTAL REVENUE")))
+                        .Add(Text.H2($"${totalRevenue:N0}"))
+                        .Add(Text.Small("From paid invoices"))))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Layout.Horizontal()
+                            .Gap(2)
+                            .Add(Icons.Clock.ToIcon())
+                            .Add(Text.Small("PENDING")))
+                        .Add(Text.H2($"${pendingInvoices:N0}"))
+                        .Add(Text.Small("Unpaid invoices"))))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Layout.Horizontal()
+                            .Gap(2)
+                            .Add(Icons.X.ToIcon())
+                            .Add(Text.Small("OVERDUE")))
+                        .Add(Text.H2($"${overdueInvoices:N0}"))
+                        .Add(Text.Small("Late payments"))))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Add(Layout.Horizontal()
+                            .Gap(2)
+                            .Add(Icons.CreditCard.ToIcon())
+                            .Add(Text.Small("EXPENSES")))
+                        .Add(Text.H2($"${totalExpenses:N0}"))
+                        .Add(Text.Small("Business expenses")))))
+            .Add(new Card(
+                invoices.Count > 0 
+                    ? new List(invoices.Take(10).Select(inv => new ListItem(
+                        title: $"#{inv.InvoiceNumber} - {inv.CustomerName}",
+                        subtitle: $"${inv.TotalAmount:N2} - Due: {inv.DueDate:MMM dd, yyyy}",
+                        badge: inv.Status
+                    )))
+                    : Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No invoices yet"))
+                        .Add(Text.P("Create your first invoice to get started"))
+            ).Title("Recent Invoices"));
+    }
+}
+
+// Invoices blade - shows list of invoices with search and create
+public class InvoicesBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        var refreshToken = this.UseRefreshToken();
+        var searchQuery = this.UseState("");
+
+        // Refresh when returning from detail view
+        this.UseEffect(() =>
+        {
+            if (refreshToken.ReturnValue != null)
+            {
+                blades.Pop(this, true);
+            }
+        }, [refreshToken]);
+
+        var invoices = db.Invoices
+            .Where(i => searchQuery.Value == "" || 
+                       i.InvoiceNumber.Contains(searchQuery.Value) ||
+                       i.CustomerName.Contains(searchQuery.Value))
+            .OrderByDescending(i => i.IssueDate)
+            .ToList();
+
+        var onInvoiceClick = new Action<Event<ListItem>>(e =>
+        {
+            var invoiceId = (int)e.Sender.Tag!;
+            var invoiceNumber = e.Sender.Title;
+            blades.Push(this, new InvoiceDetailBlade(invoiceId), invoiceNumber);
+        });
+
+        var items = invoices.Select(invoice => new ListItem(
+            title: $"#{invoice.InvoiceNumber} - {invoice.CustomerName}",
+            subtitle: $"${invoice.TotalAmount:N2} - Due: {invoice.DueDate:MMM dd, yyyy}",
+            badge: invoice.Status,
+            onClick: onInvoiceClick,
+            tag: invoice.Id
+        ));
+
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(2)
+                .Add(searchQuery.ToTextInput().Placeholder("Search invoices..."))
+                .Add(new Button(icon: Icons.Plus, onClick: _ =>
+                {
+                    // Show create invoice sheet
+                }, variant: ButtonVariant.Outline)),
+            invoices.Count > 0 
+                ? new List(items)
+                : new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No invoices found"))
+                        .Add(Text.P("Create your first invoice to get started"))
+                        .Add(new Button("Create Invoice").Icon(Icons.Plus).Variant(ButtonVariant.Primary)))
+        );
+    }
+}
+
+// Invoice detail blade - shows single invoice with sheet for editing
+public class InvoiceDetailBlade : ViewBase
+{
+    private readonly int _invoiceId;
+
+    public InvoiceDetailBlade(int invoiceId)
+    {
+        _invoiceId = invoiceId;
+    }
+
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+        
+        var invoice = db.Invoices.FirstOrDefault(i => i.Id == _invoiceId);
+        if (invoice == null)
+        {
+            return new Card("Invoice not found");
+        }
+
+        return Layout.Vertical()
+            .Gap(3)
+            .Add(Layout.Horizontal()
+                .Gap(2)
+                .Add(new Button("Edit").Icon(Icons.Pencil).Variant(ButtonVariant.Outline).WithSheet(
+                    () => new EditInvoiceSheet(invoice),
+                    title: "Edit Invoice",
+                    description: $"Editing invoice #{invoice.InvoiceNumber}",
+                    width: Size.Fraction(1/2f)
+                ))
+                .Add(new Button("Delete").Icon(Icons.Trash).Variant(ButtonVariant.Destructive)))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Invoice Number:")).Add(Text.Block(invoice.InvoiceNumber)))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Customer:")).Add(Text.Block(invoice.CustomerName)))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Status:")).Add(new Badge(invoice.Status)))
+            ).Title("Invoice Details"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Amount:")).Add(Text.Block($"${invoice.Amount:N2}")))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Tax:")).Add(Text.Block($"${invoice.TaxAmount:N2}")))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Total:")).Add(Text.H3($"${invoice.TotalAmount:N2}")))
+            ).Title("Amounts"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Issue Date:")).Add(Text.Block(invoice.IssueDate.ToString("MMM dd, yyyy"))))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Due Date:")).Add(Text.Block(invoice.DueDate.ToString("MMM dd, yyyy"))))
+            ).Title("Dates"));
+    }
+}
+
+// Edit invoice sheet
+public class EditInvoiceSheet : ViewBase
+{
+    private readonly Invoice _invoice;
+
+    public EditInvoiceSheet(Invoice invoice)
+    {
+        _invoice = invoice;
+    }
+
+    public override object? Build()
+    {
+        var customerName = this.UseState(_invoice.CustomerName);
+        var amount = this.UseState(_invoice.Amount);
+        var tax = this.UseState(_invoice.TaxAmount);
+        var status = this.UseState(_invoice.Status);
+        var client = this.UseService<IClientProvider>();
+
+        return Layout.Vertical()
+            .Gap(3)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Text.Small("Customer Name"))
+                    .Add(customerName.ToTextInput())
+                    .Add(Text.Small("Amount"))
+                    .Add(amount.ToNumberInput())
+                    .Add(Text.Small("Tax"))
+                    .Add(tax.ToNumberInput())
+                    .Add(Text.Small("Status"))
+                    .Add(new SelectInput<string>(
+                        options: new[] { "Draft", "Sent", "Paid", "Overdue" }.ToOptions(),
+                        value: status.Value,
+                        onChange: e => { status.Value = e.Value; return ValueTask.CompletedTask; }
+                    ))
+            ).Title("Invoice Information"))
+            .Add(Layout.Horizontal()
+                .Gap(2)
+                .Add(new Button("Save").Variant(ButtonVariant.Primary).HandleClick(_ =>
+                {
+                    client.Toast("Invoice updated successfully!");
+                }))
+                .Add(new Button("Cancel").Variant(ButtonVariant.Outline)));
+    }
+}
+
+// Payments blade
+public class PaymentsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var searchQuery = this.UseState("");
+
+        var payments = db.Payments
+            .Where(p => searchQuery.Value == "" || 
+                       p.Reference.Contains(searchQuery.Value))
+            .OrderByDescending(p => p.PaymentDate)
+            .ToList();
+
+        var items = payments.Select(payment => new ListItem(
+            title: $"{payment.Reference} - {payment.PaymentMethod}",
+            subtitle: $"${payment.Amount:N2} - {payment.PaymentDate:MMM dd, yyyy}"
+        ));
+
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(2)
+                .Add(searchQuery.ToTextInput().Placeholder("Search payments..."))
+                .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
+            payments.Count > 0 
+                ? new List(items)
+                : new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No payments found"))
+                        .Add(Text.P("Record your first payment to get started")))
+        );
+    }
+}
+
+// Accounts blade
+public class AccountsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        var searchQuery = this.UseState("");
+
+        var accounts = db.Accounts
+            .Where(a => searchQuery.Value == "" || 
+                       a.AccountName.Contains(searchQuery.Value) ||
+                       a.AccountNumber.Contains(searchQuery.Value))
+            .OrderBy(a => a.AccountNumber)
+            .ToList();
+
+        var onAccountClick = new Action<Event<ListItem>>(e =>
+        {
+            var accountId = (int)e.Sender.Tag!;
+            var accountName = e.Sender.Title;
+            blades.Push(this, new AccountDetailBlade(accountId), accountName);
+        });
+
+        var items = accounts.Select(account => new ListItem(
+            title: $"{account.AccountNumber} - {account.AccountName}",
+            subtitle: $"{account.AccountType} - Balance: ${account.Balance:N2}",
+            onClick: onAccountClick,
+            tag: account.Id
+        ));
+
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(2)
+                .Add(searchQuery.ToTextInput().Placeholder("Search accounts..."))
+                .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
+            accounts.Count > 0 
+                ? new List(items)
+                : new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No accounts found"))
+                        .Add(Text.P("Create your chart of accounts to get started")))
+        );
+    }
+}
+
+// Account detail blade
+public class AccountDetailBlade : ViewBase
+{
+    private readonly int _accountId;
+
+    public AccountDetailBlade(int accountId)
+    {
+        _accountId = accountId;
+    }
+
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        
+        var account = db.Accounts.FirstOrDefault(a => a.Id == _accountId);
+        if (account == null)
+        {
+            return new Card("Account not found");
+        }
+
+        var transactions = db.Transactions
+            .OrderByDescending(t => t.TransactionDate)
+            .Take(20)
+            .ToList();
+
+        return Layout.Vertical()
+            .Gap(3)
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Account Number:")).Add(Text.Block(account.AccountNumber)))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Account Name:")).Add(Text.Block(account.AccountName)))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Type:")).Add(Text.Block(account.AccountType)))
+                    .Add(Layout.Horizontal().Gap(2).Add(Text.Small("Balance:")).Add(Text.H3($"${account.Balance:N2}")))
+            ).Title("Account Details"))
+            .Add(new Card(
+                transactions.Count > 0
+                    ? new List(transactions.Select(t => new ListItem(
+                        title: t.Description,
+                        subtitle: $"${t.DebitAmount:N2} / ${t.CreditAmount:N2} - {t.TransactionDate:MMM dd, yyyy}"
+                    )))
+                    : Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No transactions"))
+                        .Add(Text.P("No transactions for this account yet"))
+            ).Title("Recent Transactions"));
+    }
+}
+
+// Transactions blade
+public class TransactionsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var searchQuery = this.UseState("");
+
+        var transactions = db.Transactions
+            .Where(t => searchQuery.Value == "" || t.Description.Contains(searchQuery.Value))
+            .OrderByDescending(t => t.TransactionDate)
+            .ToList();
+
+        var items = transactions.Select(trans => new ListItem(
+            title: trans.Description,
+            subtitle: $"${trans.DebitAmount:N2} / ${trans.CreditAmount:N2} - {trans.TransactionDate:MMM dd, yyyy}"
+        ));
+
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(2)
+                .Add(searchQuery.ToTextInput().Placeholder("Search transactions..."))
+                .Add(new Button(icon: Icons.Plus, variant: ButtonVariant.Outline)),
+            transactions.Count > 0 
+                ? new List(items)
+                : new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No transactions found"))
+                        .Add(Text.P("Your financial activity will appear here")))
+        );
+    }
+}
+
+// Reports blade
+public class ReportsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var reportTypes = new[]
+        {
+            new ListItem(
+                icon: Icons.FileText,
+                title: "Profit & Loss",
+                subtitle: "Income statement for the period"
+            ),
+            new ListItem(
+                icon: Icons.Activity,
+                title: "Balance Sheet",
+                subtitle: "Assets, liabilities, and equity"
+            ),
+            new ListItem(
+                icon: Icons.TrendingUp,
+                title: "Cash Flow",
+                subtitle: "Cash movement analysis"
+            ),
+            new ListItem(
+                icon: Icons.Circle,
+                title: "Aged Receivables",
+                subtitle: "Outstanding customer invoices"
+            ),
+            new ListItem(
+                icon: Icons.Activity,
+                title: "Aged Payables",
+                subtitle: "Outstanding vendor bills"
+            )
+        };
+
+        return new List(reportTypes);
     }
 }
