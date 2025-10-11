@@ -8,7 +8,7 @@ public static class DatabaseService
     public static void AddDatabase(this IServiceCollection services)
     {
         var connectionString = "Data Source=business_platform.db";
-        
+
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlite(connectionString));
     }
@@ -17,10 +17,10 @@ public static class DatabaseService
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
+
         // Ensure database is created
         await context.Database.EnsureCreatedAsync();
-        
+
         // Seed initial data if needed
         await SeedInitialDataAsync(context);
     }
@@ -67,6 +67,62 @@ public static class DatabaseService
         };
 
         await context.Accounts.AddRangeAsync(accounts);
+        await context.SaveChangesAsync();
+
+        var workOrders = new[]
+        {
+            new WorkOrder
+            {
+                WorkOrderNumber = "WO-001",
+                ProductName = "Widget A",
+                Quantity = 500,
+                Status = "In Production",
+                Progress = 75,
+                Priority = "High",
+                PlannedStartDate = DateTime.UtcNow.AddDays(-5),
+                PlannedEndDate = DateTime.UtcNow.AddDays(5),
+                StartDate = DateTime.UtcNow.AddDays(-3),
+                Notes = "High priority order for key customer"
+            },
+            new WorkOrder
+            {
+                WorkOrderNumber = "WO-002",
+                ProductName = "Component B",
+                Quantity = 1000,
+                Status = "Scheduled",
+                Progress = 0,
+                Priority = "Normal",
+                PlannedStartDate = DateTime.UtcNow.AddDays(2),
+                PlannedEndDate = DateTime.UtcNow.AddDays(10),
+                Notes = "Standard component production run"
+            },
+            new WorkOrder
+            {
+                WorkOrderNumber = "WO-003",
+                ProductName = "Assembly C",
+                Quantity = 250,
+                Status = "Completed",
+                Progress = 100,
+                Priority = "Normal",
+                PlannedStartDate = DateTime.UtcNow.AddDays(-10),
+                PlannedEndDate = DateTime.UtcNow.AddDays(-2),
+                StartDate = DateTime.UtcNow.AddDays(-9),
+                CompletionDate = DateTime.UtcNow.AddDays(-1)
+            },
+            new WorkOrder
+            {
+                WorkOrderNumber = "WO-004",
+                ProductName = "Custom Part D",
+                Quantity = 100,
+                Status = "Scheduled",
+                Progress = 0,
+                Priority = "Urgent",
+                PlannedStartDate = DateTime.UtcNow,
+                PlannedEndDate = DateTime.UtcNow.AddDays(3),
+                Notes = "Urgent custom order - expedite shipping"
+            }
+        };
+        await context.WorkOrders.AddRangeAsync(workOrders);
         await context.SaveChangesAsync();
     }
 }

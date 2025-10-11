@@ -49,6 +49,9 @@ public class ApplicationDbContext : DbContext
     // Subscriptions
     public DbSet<Subscription> Subscriptions { get; set; }
 
+    // Manufacturing
+    public DbSet<WorkOrder> WorkOrders { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -73,5 +76,10 @@ public class ApplicationDbContext : DbContext
             .HasMany(c => c.Opportunities)
             .WithOne(o => o.Contact)
             .HasForeignKey(o => o.ContactId);
+
+        modelBuilder.Entity<WorkOrder>()
+            .HasOne(wo => wo.Product)
+            .WithMany()
+            .HasForeignKey(wo => wo.ProductId);
     }
 }
