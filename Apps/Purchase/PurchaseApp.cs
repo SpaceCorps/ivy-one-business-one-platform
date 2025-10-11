@@ -5,7 +5,7 @@ public class PurchaseApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new PurchaseRootBlade(), "Purchase", Size.Units(110));
+        return this.UseBlades(() => new PurchaseRootBlade(), "Purchase Orders", Size.Units(110));
     }
 }
 
@@ -31,7 +31,6 @@ public class PurchaseRootBlade : ViewBase
             .Gap(4)
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(Text.H3("Purchase Orders"))
                 .Add(new Button("New Purchase Order", _ => client.Toast("Create PO"))
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)))
