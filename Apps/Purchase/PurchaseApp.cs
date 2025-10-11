@@ -37,7 +37,7 @@ public class PurchaseRootBlade : ViewBase
             subtitle: $"${order.Amount:N2}",
             icon: Icons.ShoppingBag,
             badge: order.Status.ToString(),
-            onClick: _ => blades.Push(this, new PurchaseOrderDetailBlade(order.Id), order.OrderNumber)
+            onClick: _ => blades.Push(this, new PurchaseOrderDetailBlade(order.Id, () => refreshToken.Refresh()), order.OrderNumber)
         ));
         
         var mainContent = BladeHelper.WithHeader(
@@ -65,7 +65,7 @@ public class PurchaseRootBlade : ViewBase
     }
 }
 
-public class PurchaseOrderDetailBlade(int orderId) : ViewBase
+public class PurchaseOrderDetailBlade(int orderId, Action? onRefresh = null) : ViewBase
 {
     public override object? Build()
     {
@@ -98,8 +98,24 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                 dbOrder.UpdatedAt = DateTime.UtcNow;
                 context.SaveChanges();
                 refreshToken.Refresh();
+                onRefresh?.Invoke();
             }
         }, [currentStatus.ToTrigger()]);
+
+        // Refresh order data when refresh token changes
+        this.UseEffect(() =>
+        {
+            if (refreshToken.ReturnValue != null)
+            {
+                // Reload order data from database
+                var updatedOrder = context.PurchaseOrders.FirstOrDefault(po => po.Id == orderId);
+                if (updatedOrder != null)
+                {
+                    // Update local state with fresh data
+                    currentStatus.Set(updatedOrder.Status);
+                }
+            }
+        }, [refreshToken.ToTrigger()]);
         
         var statusBadge = new Badge(currentStatus.Value.ToString())
             .Variant(currentStatus.Value == PurchaseOrderStatus.Received ? BadgeVariant.Success :
@@ -159,6 +175,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                                 context.SaveChanges();
                                 client.Toast($"Purchase Order {order.OrderNumber} deleted successfully!");
                                 refreshToken.Refresh();
+                                onRefresh?.Invoke();
                                 blades.Pop();
                             }
                         }
@@ -174,6 +191,7 @@ public class PurchaseOrderDetailBlade(int orderId) : ViewBase
                 new PurchaseOrderFormSheet(orderId, () => {
                     isEditOpen.Set(false);
                     refreshToken.Refresh();
+                    onRefresh?.Invoke();
                 }),
                 title: "Edit Purchase Order",
                 description: $"Edit purchase order {order.OrderNumber}"
