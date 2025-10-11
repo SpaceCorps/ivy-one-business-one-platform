@@ -8,7 +8,7 @@ public class SignApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new SignRootBlade(), "Digital Signatures", Size.Units(80));
+        return this.UseBlades(() => new SignRootBlade(), "Digital Signatures", Size.Units(110));
     }
 }
 
