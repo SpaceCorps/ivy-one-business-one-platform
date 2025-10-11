@@ -1,18 +1,24 @@
 using IvyOneBusinessOnePlatform.Apps;
 using IvyOneBusinessOnePlatform.Services;
+using IvyOneBusinessOnePlatform.Data;
 
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
-// Configure services
-var services = new ServiceCollection();
-services.AddDatabase();
+var server = new Server();
 
-var serviceProvider = services.BuildServiceProvider();
+// Configure database services
+server.Services.AddDatabase();
 
 // Initialize database
-await serviceProvider.InitializeDatabaseAsync();
+using (var scope = server.Services.BuildServiceProvider().CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await context.Database.EnsureCreatedAsync();
+    
+    // Seed data
+    await server.Services.BuildServiceProvider().InitializeDatabaseAsync();
+}
 
-var server = new Server();
 #if DEBUG
 server.UseHotReload();
 #endif
