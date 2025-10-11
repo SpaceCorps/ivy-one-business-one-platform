@@ -17,6 +17,7 @@ global using Ivy.Views.Dashboards;
 global using Ivy.Views.Forms;
 global using Ivy.Views.Tables;
 global using Ivy.Widgets.Inputs;
+global using Ivy.Widgets;
 global using Microsoft.Extensions.Configuration;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
