@@ -5,7 +5,7 @@ public class FieldServiceApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new FieldServiceRootBlade(), "Field Service");
+        return this.UseBlades(() => new FieldServiceRootBlade(), "Field Service", Size.Units(80));
     }
 }
 

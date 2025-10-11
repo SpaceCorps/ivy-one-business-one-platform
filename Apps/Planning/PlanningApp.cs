@@ -5,7 +5,7 @@ public class PlanningApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new PlanningRootBlade(), "Planning");
+        return this.UseBlades(() => new PlanningRootBlade(), "Planning", Size.Units(80));
     }
 }
 

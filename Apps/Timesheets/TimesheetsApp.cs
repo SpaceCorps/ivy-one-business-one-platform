@@ -8,7 +8,7 @@ public class TimesheetsApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new TimesheetsRootBlade(), "Timesheets");
+        return this.UseBlades(() => new TimesheetsRootBlade(), "Timesheets", Size.Units(80));
     }
 }
 

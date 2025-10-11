@@ -5,7 +5,7 @@ public class WebsiteApp : ViewBase
 {
     public override object? Build()
     {
-        return this.UseBlades(() => new WebsiteRootBlade(), "Website");
+        return this.UseBlades(() => new WebsiteRootBlade(), "Website", Size.Units(80));
     }
 }
 
