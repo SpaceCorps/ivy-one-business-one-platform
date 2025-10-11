@@ -196,7 +196,6 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
             DepartmentId = departments.FirstOrDefault()?.Id ?? 0
         });
         
-        var departmentId = this.UseState(employeeForm.Value.DepartmentId);
         var statusOptions = new[] { "Active", "Inactive", "Terminated" };
         
         return new FooterLayout(
@@ -262,7 +261,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                                 existingEmployee.Status = employeeForm.Value.Status;
                                 existingEmployee.HireDate = employeeForm.Value.HireDate;
                                 existingEmployee.TerminationDate = employeeForm.Value.TerminationDate;
-                                existingEmployee.DepartmentId = departmentId.Value;
+                                existingEmployee.DepartmentId = employeeForm.Value.DepartmentId;
                                 existingEmployee.UpdatedAt = DateTime.UtcNow;
                             }
                             else
@@ -280,7 +279,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                                     Status = employeeForm.Value.Status,
                                     HireDate = employeeForm.Value.HireDate,
                                     TerminationDate = employeeForm.Value.TerminationDate,
-                                    DepartmentId = departmentId.Value,
+                                    DepartmentId = employeeForm.Value.DepartmentId,
                                     CreatedAt = DateTime.UtcNow,
                                     UpdatedAt = DateTime.UtcNow
                                 };
@@ -346,9 +345,15 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                             employeeForm.Set(updated);
                         }).Placeholder("Software Engineer"))
                         .Add(Text.Small("Department"))
-                        .Add(new SelectInput<int>(departmentId.Value, e => {
-                            departmentId.Set(e.Value);
-                        }, departments.Select(d => $"{d.Id}:{d.Name}").ToOptions()))
+                        .Add(new SelectInput<string>(departments.FirstOrDefault(d => d.Id == employeeForm.Value.DepartmentId)?.Name ?? "", e => {
+                            var selectedDept = departments.FirstOrDefault(d => d.Name == e.Value);
+                            if (selectedDept != null)
+                            {
+                                var updated = employeeForm.Value;
+                                updated.DepartmentId = selectedDept.Id;
+                                employeeForm.Set(updated);
+                            }
+                        }, departments.Select(d => d.Name).ToOptions()))
                         .Add(Text.Small("Salary ($)"))
                         .Add(new NumberInput<decimal>(employeeForm.Value.Salary, v => {
                             var updated = employeeForm.Value;
@@ -373,7 +378,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                             employeeForm.Set(updated);
                         }))
                         .Add(Text.Small("Termination Date (Optional)"))
-                        .Add(new DateTimeInput<DateTime>(employeeForm.Value.TerminationDate ?? DateTime.UtcNow, e => {
+                        .Add(new DateTimeInput<DateTime?>(employeeForm.Value.TerminationDate, e => {
                             var updated = employeeForm.Value;
                             updated.TerminationDate = e.Value;
                             employeeForm.Set(updated);
