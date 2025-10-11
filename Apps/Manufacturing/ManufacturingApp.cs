@@ -19,13 +19,21 @@ public class ManufacturingRootBlade : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var searchTerm = this.UseState("");
         
         var workOrders = context.WorkOrders
             .Include(wo => wo.Product)
             .OrderByDescending(wo => wo.CreatedAt)
             .ToList();
         
-        var listItems = workOrders.Select(wo => new ListItem(
+        var filteredWorkOrders = workOrders
+            .Where(wo => string.IsNullOrEmpty(searchTerm.Value) ||
+                        wo.WorkOrderNumber.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
+                        wo.ProductName.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
+                        wo.Status.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        
+        var listItems = filteredWorkOrders.Select(wo => new ListItem(
             title: $"{wo.WorkOrderNumber} - {wo.ProductName}",
             subtitle: $"Qty: {wo.Quantity} - {wo.Progress}% complete - Priority: {wo.Priority}",
             icon: Icons.Settings,
@@ -33,18 +41,17 @@ public class ManufacturingRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new WorkOrderDetailBlade(wo.Id), wo.WorkOrderNumber); return default; }
         ));
         
-        return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
-            .Add(Layout.Horizontal()
-                .Gap(12)
-                .Add(Text.H3("Manufacturing Orders"))
+        return BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(8)
+                .Add(searchTerm.ToTextInput().Placeholder("Search work orders..."))
                 .Add(new Button("New Work Order", _ => client.Toast("Create work order"))
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)))
-            .Add(workOrders.Count == 0 
-                ? Text.Block("No work orders yet. Create your first work order!")
-                : new List(listItems));
+                    .Variant(ButtonVariant.Primary)),
+            filteredWorkOrders.Count == 0 
+                ? Text.Block("No work orders found. Try adjusting your search or create a new work order!")
+                : new List(listItems)
+        );
     }
 }
 
