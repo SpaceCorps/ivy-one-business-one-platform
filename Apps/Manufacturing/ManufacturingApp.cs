@@ -160,6 +160,7 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
         var refresh = this.UseState(0);
         
         // Reload from database on each render to get fresh data
@@ -294,6 +295,21 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             .Icon(Icons.RotateCcw)
                             .Variant(ButtonVariant.Outline)
                         : null)
+                    // Delete - available for all work orders
+                    .Add(new Button("Delete", _ => {
+                        var wo = context.WorkOrders.Find(workOrderId);
+                        if (wo != null)
+                        {
+                            var woNumber = wo.WorkOrderNumber;
+                            context.WorkOrders.Remove(wo);
+                            context.SaveChanges();
+                            client.Toast($"Work order {woNumber} deleted successfully!");
+                            blades.Pop(this, true);
+                        }
+                        return default;
+                    })
+                        .Icon(Icons.Trash)
+                        .Variant(ButtonVariant.Destructive))
             ).Title("Actions"));
     }
 }
