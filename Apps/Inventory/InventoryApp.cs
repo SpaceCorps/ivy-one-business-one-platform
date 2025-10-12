@@ -80,6 +80,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var (alertView, showAlert) = this.UseAlert();
         
         var initialProduct = context.Products.FirstOrDefault(p => p.Id == productId);
         
@@ -175,26 +176,37 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
                     .HandleClick(_ => {
-                        try
-                        {
-                            var productToDelete = GetCurrentProduct();
-                            if (productToDelete != null)
-                            {
-                                context.Products.Remove(productToDelete);
-                                context.SaveChanges();
-                                client.Toast($"Product {productData.Value.Name} deleted successfully!", "Success");
-                                refreshToken.Refresh();
-                                onRefresh?.Invoke();
-                                blades.Pop();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Error(ex);
-                        }
+                        showAlert(
+                            $"Are you sure you want to permanently delete product '{productData.Value.Name}'? This action cannot be undone.",
+                            result => {
+                                if (result == AlertResult.Ok)
+                                {
+                                    try
+                                    {
+                                        var productToDelete = GetCurrentProduct();
+                                        if (productToDelete != null)
+                                        {
+                                            context.Products.Remove(productToDelete);
+                                            context.SaveChanges();
+                                            client.Toast($"Product {productData.Value.Name} deleted successfully!", "Success");
+                                            refreshToken.Refresh();
+                                            onRefresh?.Invoke();
+                                            blades.Pop();
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        client.Error(ex);
+                                    }
+                                }
+                            },
+                            "Confirm Deletion"
+                        );
+                        return default;
                     }))
                 .Add(new Button("Cancel", _ => blades.Pop())
-                    .Variant(ButtonVariant.Secondary)));
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(alertView);
     }
 }
 
