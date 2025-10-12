@@ -566,6 +566,25 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
 
 public class ContactFormSheet(int? contactId = null, Action? onClose = null) : ViewBase
 {
+    private Contact CloneContact(Contact source) => new Contact
+    {
+        Id = source.Id,
+        FirstName = source.FirstName,
+        LastName = source.LastName,
+        Email = source.Email,
+        Phone = source.Phone,
+        Company = source.Company,
+        JobTitle = source.JobTitle,
+        Address = source.Address,
+        City = source.City,
+        State = source.State,
+        ZipCode = source.ZipCode,
+        Country = source.Country,
+        Notes = source.Notes,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -678,27 +697,27 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                         .Add(Text.Small("Personal Information"))
                         .Add(Text.Small("First Name"))
                         .Add(new TextInput(contactForm.Value.FirstName, e => {
-                            var updated = contactForm.Value;
-                            updated.FirstName = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.FirstName = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("John"))
                         .Add(Text.Small("Last Name"))
                         .Add(new TextInput(contactForm.Value.LastName, e => {
-                            var updated = contactForm.Value;
-                            updated.LastName = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.LastName = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("Doe"))
                         .Add(Text.Small("Email"))
                         .Add(new TextInput(contactForm.Value.Email, e => {
-                            var updated = contactForm.Value;
-                            updated.Email = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Email = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("john@example.com"))
                         .Add(Text.Small("Phone"))
                         .Add(new TextInput(contactForm.Value.Phone, e => {
-                            var updated = contactForm.Value;
-                            updated.Phone = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Phone = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("+1 (555) 123-4567"))
                 ).Title("Contact Details"))
                 
@@ -707,15 +726,15 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                         .Add(Text.Small("Company Information"))
                         .Add(Text.Small("Company"))
                         .Add(new TextInput(contactForm.Value.Company, e => {
-                            var updated = contactForm.Value;
-                            updated.Company = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Company = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("Acme Corp"))
                         .Add(Text.Small("Job Title"))
                         .Add(new TextInput(contactForm.Value.JobTitle, e => {
-                            var updated = contactForm.Value;
-                            updated.JobTitle = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.JobTitle = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("Sales Manager"))
                 ).Title("Company"))
                 
@@ -724,33 +743,33 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                         .Add(Text.Small("Address Information"))
                         .Add(Text.Small("Address"))
                         .Add(new TextInput(contactForm.Value.Address, e => {
-                            var updated = contactForm.Value;
-                            updated.Address = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Address = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("123 Main St"))
                         .Add(Text.Small("City"))
                         .Add(new TextInput(contactForm.Value.City, e => {
-                            var updated = contactForm.Value;
-                            updated.City = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.City = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("New York"))
                         .Add(Text.Small("State"))
                         .Add(new TextInput(contactForm.Value.State, e => {
-                            var updated = contactForm.Value;
-                            updated.State = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.State = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("NY"))
                         .Add(Text.Small("Zip Code"))
                         .Add(new TextInput(contactForm.Value.ZipCode, e => {
-                            var updated = contactForm.Value;
-                            updated.ZipCode = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.ZipCode = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("10001"))
                         .Add(Text.Small("Country"))
                         .Add(new TextInput(contactForm.Value.Country, e => {
-                            var updated = contactForm.Value;
-                            updated.Country = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Country = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("USA"))
                 ).Title("Address"))
                 
@@ -759,9 +778,9 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
                         .Add(new TextInput(contactForm.Value.Notes, e => {
-                            var updated = contactForm.Value;
-                            updated.Notes = e.Value;
-                            contactForm.Set(updated);
+                            var cloned = CloneContact(contactForm.Value);
+                            cloned.Notes = e.Value;
+                            contactForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                 ).Title("Notes"))
         );
@@ -770,6 +789,23 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
 
 public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBase
 {
+    private Lead CloneLead(Lead source) => new Lead
+    {
+        Id = source.Id,
+        FirstName = source.FirstName,
+        LastName = source.LastName,
+        Email = source.Email,
+        Phone = source.Phone,
+        Company = source.Company,
+        JobTitle = source.JobTitle,
+        Source = source.Source,
+        Status = source.Status,
+        EstimatedValue = source.EstimatedValue,
+        Notes = source.Notes,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -879,39 +915,39 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                         .Add(Text.Small("Lead Information"))
                         .Add(Text.Small("First Name"))
                         .Add(new TextInput(leadForm.Value.FirstName, e => {
-                            var updated = leadForm.Value;
-                            updated.FirstName = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.FirstName = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("John"))
                         .Add(Text.Small("Last Name"))
                         .Add(new TextInput(leadForm.Value.LastName, e => {
-                            var updated = leadForm.Value;
-                            updated.LastName = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.LastName = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("Doe"))
                         .Add(Text.Small("Email"))
                         .Add(new TextInput(leadForm.Value.Email, e => {
-                            var updated = leadForm.Value;
-                            updated.Email = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Email = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("john@example.com"))
                         .Add(Text.Small("Phone"))
                         .Add(new TextInput(leadForm.Value.Phone, e => {
-                            var updated = leadForm.Value;
-                            updated.Phone = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Phone = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("+1 (555) 123-4567"))
                         .Add(Text.Small("Company"))
                         .Add(new TextInput(leadForm.Value.Company, e => {
-                            var updated = leadForm.Value;
-                            updated.Company = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Company = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("Acme Corp"))
                         .Add(Text.Small("Job Title"))
                         .Add(new TextInput(leadForm.Value.JobTitle, e => {
-                            var updated = leadForm.Value;
-                            updated.JobTitle = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.JobTitle = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("CEO"))
                 ).Title("Lead Details"))
                 
@@ -920,21 +956,21 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                         .Add(Text.Small("Lead Tracking"))
                         .Add(Text.Small("Source"))
                         .Add(new SelectInput<string>(leadForm.Value.Source, e => {
-                            var updated = leadForm.Value;
-                            updated.Source = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Source = e.Value;
+                            leadForm.Set(cloned);
                         }, sourceOptions.ToOptions()))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(leadForm.Value.Status, e => {
-                            var updated = leadForm.Value;
-                            updated.Status = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Status = e.Value;
+                            leadForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                         .Add(Text.Small("Estimated Value ($)"))
                         .Add(new NumberInput<decimal>(leadForm.Value.EstimatedValue, v => {
-                            var updated = leadForm.Value;
-                            updated.EstimatedValue = v;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.EstimatedValue = v;
+                            leadForm.Set(cloned);
                         }).Placeholder("0.00"))
                 ).Title("Lead Status"))
                 
@@ -943,9 +979,9 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
                         .Add(new TextInput(leadForm.Value.Notes, e => {
-                            var updated = leadForm.Value;
-                            updated.Notes = e.Value;
-                            leadForm.Set(updated);
+                            var cloned = CloneLead(leadForm.Value);
+                            cloned.Notes = e.Value;
+                            leadForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                 ).Title("Notes"))
         );
@@ -954,6 +990,21 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
 
 public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = null) : ViewBase
 {
+    private Opportunity CloneOpportunity(Opportunity source) => new Opportunity
+    {
+        Id = source.Id,
+        ContactId = source.ContactId,
+        Name = source.Name,
+        Description = source.Description,
+        Amount = source.Amount,
+        Stage = source.Stage,
+        Probability = source.Probability,
+        ExpectedCloseDate = source.ExpectedCloseDate,
+        Notes = source.Notes,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -1058,21 +1109,21 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                         .Add(Text.Small("Opportunity Information"))
                         .Add(Text.Small("Opportunity Name"))
                         .Add(new TextInput(opportunityForm.Value.Name, e => {
-                            var updated = opportunityForm.Value;
-                            updated.Name = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Name = e.Value;
+                            opportunityForm.Set(cloned);
                         }).Placeholder("Q1 Software License"))
                         .Add(Text.Small("Contact"))
                         .Add(new SelectInput<int>(opportunityForm.Value.ContactId, e => {
-                            var updated = opportunityForm.Value;
-                            updated.ContactId = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.ContactId = e.Value;
+                            opportunityForm.Set(cloned);
                         }, contacts.Select(c => (c.Id, $"{c.FirstName} {c.LastName} - {c.Company}")).ToOptions()))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(opportunityForm.Value.Description, e => {
-                            var updated = opportunityForm.Value;
-                            updated.Description = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Description = e.Value;
+                            opportunityForm.Set(cloned);
                         }).Placeholder("Opportunity description...").Variant(TextInputs.Textarea))
                 ).Title("Opportunity Details"))
                 
@@ -1081,27 +1132,27 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                         .Add(Text.Small("Sales Information"))
                         .Add(Text.Small("Amount ($)"))
                         .Add(new NumberInput<decimal>(opportunityForm.Value.Amount, v => {
-                            var updated = opportunityForm.Value;
-                            updated.Amount = v;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Amount = v;
+                            opportunityForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Stage"))
                         .Add(new SelectInput<string>(opportunityForm.Value.Stage, e => {
-                            var updated = opportunityForm.Value;
-                            updated.Stage = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Stage = e.Value;
+                            opportunityForm.Set(cloned);
                         }, stageOptions.ToOptions()))
                         .Add(Text.Small("Probability (%)"))
                         .Add(new NumberInput<int>(opportunityForm.Value.Probability, v => {
-                            var updated = opportunityForm.Value;
-                            updated.Probability = v;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Probability = v;
+                            opportunityForm.Set(cloned);
                         }).Placeholder("50"))
                         .Add(Text.Small("Expected Close Date"))
                         .Add(new DateTimeInput<DateTime>(opportunityForm.Value.ExpectedCloseDate, e => {
-                            var updated = opportunityForm.Value;
-                            updated.ExpectedCloseDate = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.ExpectedCloseDate = e.Value;
+                            opportunityForm.Set(cloned);
                         }))
                 ).Title("Sales Details"))
                 
@@ -1110,9 +1161,9 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
                         .Add(new TextInput(opportunityForm.Value.Notes, e => {
-                            var updated = opportunityForm.Value;
-                            updated.Notes = e.Value;
-                            opportunityForm.Set(updated);
+                            var cloned = CloneOpportunity(opportunityForm.Value);
+                            cloned.Notes = e.Value;
+                            opportunityForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                 ).Title("Notes"))
         );
