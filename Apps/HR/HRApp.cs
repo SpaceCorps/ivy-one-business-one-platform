@@ -179,7 +179,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
         string Email,
         string Phone,
         string JobTitle,
-        int DepartmentId,
+        string DepartmentId,
         decimal Salary,
         string Status,
         DateTime HireDate,
@@ -203,7 +203,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                 existingEmployee.Email,
                 existingEmployee.Phone,
                 existingEmployee.JobTitle,
-                existingEmployee.DepartmentId,
+                existingEmployee.Department?.Name ?? "",
                 existingEmployee.Salary,
                 existingEmployee.Status,
                 existingEmployee.HireDate,
@@ -216,7 +216,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                 "",
                 "",
                 "",
-                departments.FirstOrDefault()?.Id ?? 0,
+                departments.FirstOrDefault()?.Name ?? "",
                 50000,
                 "Active",
                 DateTime.UtcNow,
@@ -240,10 +240,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
             .Label(m => m.HireDate, "Hire Date")
             .Label(m => m.TerminationDate, "Termination Date")
             .Builder(m => m.EmployeeId, s => s.ToTextInput().Disabled(isEdit))
-            .Builder(m => m.DepartmentId, s => s.ToSelectInput(departments.Select(d => (d.Id, d.Name)).ToOptions()))
-            .Builder(m => m.Status, s => s.ToSelectInput(new[] { "Active", "Inactive", "Terminated" }.ToOptions()))
-            .Builder(m => m.HireDate, s => s.ToDateTimeInput())
-            .Builder(m => m.TerminationDate, s => s.ToDateTimeInput())
+            .Builder(m => m.DepartmentId, s => s.ToSelectInput(departments.Select(d => d.Name).ToOptions()))
             .Validate<decimal>(m => m.Salary, salary => (salary > 0, "Salary must be greater than zero"))
             .Validate<string>(m => m.FirstName, firstName => (firstName.Length <= 100, "First Name cannot exceed 100 characters"))
             .Validate<string>(m => m.LastName, lastName => (lastName.Length <= 100, "Last Name cannot exceed 100 characters"));
@@ -269,7 +266,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                         existingEmployee.Status = employeeForm.Value.Status;
                         existingEmployee.HireDate = employeeForm.Value.HireDate;
                         existingEmployee.TerminationDate = employeeForm.Value.TerminationDate;
-                        existingEmployee.DepartmentId = employeeForm.Value.DepartmentId;
+                        existingEmployee.DepartmentId = departments.FirstOrDefault(d => d.Name == employeeForm.Value.DepartmentId)?.Id ?? 1;
                         existingEmployee.UpdatedAt = DateTime.UtcNow;
                     }
                     else
@@ -287,7 +284,7 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                             Status = employeeForm.Value.Status,
                             HireDate = employeeForm.Value.HireDate,
                             TerminationDate = employeeForm.Value.TerminationDate,
-                            DepartmentId = employeeForm.Value.DepartmentId,
+                            DepartmentId = departments.FirstOrDefault(d => d.Name == employeeForm.Value.DepartmentId)?.Id ?? 1,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
