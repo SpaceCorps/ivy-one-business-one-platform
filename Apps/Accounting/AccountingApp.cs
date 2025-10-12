@@ -327,6 +327,7 @@ public class AccountingMenuBlade : ViewBase
     {
         var blades = this.UseContext<IBladeController>();
         var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
 
         var invoicesCount = db.Invoices.Count();
         var accountsCount = db.Accounts.Count();
@@ -338,7 +339,7 @@ public class AccountingMenuBlade : ViewBase
         Func<Event<ListItem>, ValueTask> onPaymentsClick = e => { blades.Push(this, new PaymentsBlade(), "Payments"); return ValueTask.CompletedTask; };
         Func<Event<ListItem>, ValueTask> onAccountsClick = e => { blades.Push(this, new AccountsBlade(), "Accounts"); return ValueTask.CompletedTask; };
         Func<Event<ListItem>, ValueTask> onTransactionsClick = e => { blades.Push(this, new TransactionsBlade(), "Transactions"); return ValueTask.CompletedTask; };
-        Func<Event<ListItem>, ValueTask> onReportsClick = e => { blades.Push(this, new ReportsBlade(), "Reports"); return ValueTask.CompletedTask; };
+        Func<Event<ListItem>, ValueTask> onReportsClick = e => { client.Toast("Reports functionality coming soon!"); return ValueTask.CompletedTask; };
 
         var menuItems = new[]
         {
@@ -575,6 +576,7 @@ public class InvoicesBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewInvoiceOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
+        var context = this.UseService<ApplicationDbContext>();
         
         var query = context.Invoices.AsQueryable();
         
@@ -624,19 +626,13 @@ public class InvoicesBlade : ViewBase
 
 public class InvoiceDetailBlade(int invoiceId, Action? onRefresh = null) : ViewBase
 {
-    private readonly RefreshToken _refreshToken;
-
-    public CreateInvoiceSheet(RefreshToken refreshToken)
-    {
-        _refreshToken = refreshToken;
-    }
-
     public override object? Build()
     {
         var db = this.UseService<ApplicationDbContext>();
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var refreshToken = this.UseRefreshToken();
         
         var initialInvoice = context.Invoices.Include(i => i.Payments).FirstOrDefault(i => i.Id == invoiceId);
         
@@ -651,7 +647,6 @@ public class InvoiceDetailBlade(int invoiceId, Action? onRefresh = null) : ViewB
         
         var invoiceData = this.UseState(initialInvoice);
         var isEditOpen = this.UseState(false);
-        var refreshToken = this.UseRefreshToken();
         
         // Refresh invoice data when refresh token changes
         this.UseEffect(() =>
@@ -772,6 +767,7 @@ public class AccountsBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewAccountOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
+        var context = this.UseService<ApplicationDbContext>();
         
         var query = context.Accounts.AsQueryable();
         
@@ -928,8 +924,8 @@ public class AccountDetailBlade(int accountId, Action? onRefresh = null) : ViewB
     }
 }
 
-// Accounts blade
-public class AccountsBlade : ViewBase
+// Transactions blade
+public class TransactionsBlade : ViewBase
 {
     public override object? Build()
     {
@@ -938,6 +934,7 @@ public class AccountsBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewTransactionOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
+        var context = this.UseService<ApplicationDbContext>();
         
         var query = context.Transactions.AsQueryable();
         
@@ -1660,5 +1657,158 @@ public class TransactionFormSheet(int? transactionId = null, Action? onClose = n
                                       "No amount entered"))
                 ).Title("Amounts"))
         );
+    }
+}
+
+public class PaymentsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+        var blades = this.UseContext<IBladeController>();
+        var searchQuery = this.UseState("");
+        var refreshToken = this.UseRefreshToken();
+        
+        var query = db.Payments.Include(p => p.Invoice).AsQueryable();
+        
+        if (!string.IsNullOrEmpty(searchQuery.Value))
+        {
+            var searchPattern = $"%{searchQuery.Value}%";
+            query = query.Where(p => 
+                EF.Functions.Like(p.Notes, searchPattern) ||
+                EF.Functions.Like(p.PaymentMethod, searchPattern) ||
+                EF.Functions.Like(p.Reference, searchPattern));
+        }
+
+        var payments = query.OrderByDescending(p => p.PaymentDate).ToList();
+        
+        var listItems = payments.Select(payment => new ListItem(
+            title: $"Payment #{payment.Id}",
+            subtitle: $"{payment.Notes} - {payment.Amount:C} - {payment.PaymentDate:MMM dd, yyyy}",
+            icon: Icons.CreditCard,
+            badge: payment.PaymentMethod,
+            onClick: _ => blades.Push(this, new PaymentDetailBlade(payment.Id, () => refreshToken.Refresh()), $"Payment #{payment.Id}")
+        ));
+        
+        var mainContent = BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(4)
+                .Add(searchQuery.ToSearchInput().Placeholder("Search payments..."))
+                .Add(new Button("New Payment")
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => client.Toast("New Payment functionality coming soon!"))),
+            payments.Count == 0 
+                ? Text.Block("No payments found. Try a different search or create your first payment!")
+                : new List(listItems)
+        );
+
+        return mainContent;
+    }
+}
+
+public class ReportsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+        var blades = this.UseContext<IBladeController>();
+        
+        var reports = new[]
+        {
+            new ListItem(
+                title: "Income Statement",
+                subtitle: "Revenue and expense summary",
+                icon: Icons.FileText,
+                onClick: _ => { client.Toast("Income Statement report coming soon!"); return ValueTask.CompletedTask; }
+            ),
+            new ListItem(
+                title: "Balance Sheet",
+                subtitle: "Assets, liabilities, and equity",
+                icon: Icons.FileText,
+                onClick: _ => { client.Toast("Balance Sheet report coming soon!"); return ValueTask.CompletedTask; }
+            ),
+            new ListItem(
+                title: "Cash Flow Statement",
+                subtitle: "Cash inflows and outflows",
+                icon: Icons.TrendingUp,
+                onClick: _ => { client.Toast("Cash Flow Statement report coming soon!"); return ValueTask.CompletedTask; }
+            ),
+            new ListItem(
+                title: "Accounts Receivable Aging",
+                subtitle: "Outstanding customer invoices",
+                icon: Icons.Clock,
+                onClick: _ => { client.Toast("Aging report coming soon!"); return ValueTask.CompletedTask; }
+            ),
+            new ListItem(
+                title: "Accounts Payable Aging",
+                subtitle: "Outstanding vendor bills",
+                icon: Icons.Calendar,
+                onClick: _ => { client.Toast("Payable aging report coming soon!"); return ValueTask.CompletedTask; }
+            )
+        };
+        
+        var mainContent = BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(4)
+                .Add(new Button("Export Report")
+                    .Icon(Icons.Download)
+                    .Variant(ButtonVariant.Secondary)
+                    .HandleClick(_ => client.Toast("Export functionality coming soon!"))),
+            new List(reports)
+        );
+
+        return mainContent;
+    }
+}
+
+public class PaymentDetailBlade(int paymentId, Action? onRefresh = null) : ViewBase
+{
+    public override object? Build()
+    {
+        var db = this.UseService<ApplicationDbContext>();
+        var client = this.UseService<IClientProvider>();
+        var blades = this.UseContext<IBladeController>();
+        
+        var payment = db.Payments.Include(p => p.Invoice).FirstOrDefault(p => p.Id == paymentId);
+        
+        if (payment == null)
+        {
+            return Layout.Vertical()
+                .Gap(4)
+                .Add(Text.H3("Payment Not Found"))
+                .Add(new Button("Go Back", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary));
+        }
+        
+        var paymentDetails = new
+        {
+            PaymentNumber = $"Payment #{payment.Id}",
+            Invoice = payment.Invoice?.InvoiceNumber ?? "N/A",
+            Amount = payment.Amount.ToString("C"),
+            PaymentDate = payment.PaymentDate.ToString("MMM dd, yyyy"),
+            PaymentMethod = payment.PaymentMethod,
+            Notes = payment.Notes,
+            Reference = payment.Reference ?? "N/A"
+        };
+        
+        return Layout.Vertical()
+            .Gap(4)
+            .Add(Text.H3($"Payment #{payment.Id}"))
+            .Add(paymentDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Notes))
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(new Button("Edit Payment")
+                    .Variant(ButtonVariant.Outline)
+                    .Icon(Icons.Pencil)
+                    .HandleClick(_ => client.Toast("Edit payment functionality coming soon!")))
+                .Add(new Button("Delete Payment")
+                    .Variant(ButtonVariant.Destructive)
+                    .Icon(Icons.Trash)
+                    .HandleClick(_ => client.Toast("Delete payment functionality coming soon!")))
+                .Add(new Button("Cancel", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary)));
     }
 }
