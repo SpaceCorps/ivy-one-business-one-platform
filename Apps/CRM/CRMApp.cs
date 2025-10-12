@@ -8,7 +8,280 @@ public class CRMApp : ViewBase
 {
     public override object? Build()
     {
+        var seeded = this.UseState(false);
+
+        // Seed CRM data if needed
+        this.UseEffect(() =>
+        {
+            if (!seeded.Value)
+            {
+                seeded.Value = true;
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    // Wait a bit for the app to fully initialize
+                    await System.Threading.Tasks.Task.Delay(1000);
+                    await SeedCRMDataAsync();
+                });
+            }
+        }, []);
+
         return this.UseBlades(() => new CRMRootBlade(), "CRM", Size.Units(110));
+    }
+
+    private static async System.Threading.Tasks.Task SeedCRMDataAsync()
+    {
+        try
+        {
+            // Create a new DbContext directly
+            var connectionString = "Data Source=business_platform.db";
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseSqlite(connectionString);
+
+            using var db = new ApplicationDbContext(optionsBuilder.Options);
+
+            // Only seed if no contacts exist
+            if (await db.Contacts.AnyAsync())
+                return;
+
+            // Seed contacts
+            var contacts = new[]
+            {
+                new Contact
+                {
+                    FirstName = "John",
+                    LastName = "Smith",
+                    Email = "john.smith@acmecorp.com",
+                    Phone = "+1-555-0123",
+                    Company = "Acme Corporation",
+                    JobTitle = "CEO",
+                    Address = "123 Business Ave",
+                    City = "New York",
+                    State = "NY",
+                    ZipCode = "10001",
+                    Country = "USA",
+                    Notes = "Key decision maker, interested in enterprise solution",
+                    CreatedAt = DateTime.UtcNow.AddDays(-30),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-5)
+                },
+                new Contact
+                {
+                    FirstName = "Sarah",
+                    LastName = "Johnson",
+                    Email = "sarah.johnson@techstart.com",
+                    Phone = "+1-555-0456",
+                    Company = "TechStart Inc",
+                    JobTitle = "CTO",
+                    Address = "456 Innovation Blvd",
+                    City = "San Francisco",
+                    State = "CA",
+                    ZipCode = "94105",
+                    Country = "USA",
+                    Notes = "Technical decision maker, prefers cloud solutions",
+                    CreatedAt = DateTime.UtcNow.AddDays(-25),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-10)
+                },
+                new Contact
+                {
+                    FirstName = "Michael",
+                    LastName = "Davis",
+                    Email = "michael.davis@globalent.com",
+                    Phone = "+1-555-0789",
+                    Company = "Global Enterprises",
+                    JobTitle = "VP of Operations",
+                    Address = "789 Corporate Plaza",
+                    City = "Chicago",
+                    State = "IL",
+                    ZipCode = "60601",
+                    Country = "USA",
+                    Notes = "Budget authority, needs ROI justification",
+                    CreatedAt = DateTime.UtcNow.AddDays(-20),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-3)
+                },
+                new Contact
+                {
+                    FirstName = "Emily",
+                    LastName = "Wilson",
+                    Email = "emily.wilson@innovatelabs.com",
+                    Phone = "+1-555-0321",
+                    Company = "Innovate Labs",
+                    JobTitle = "Head of IT",
+                    Address = "321 Tech Park",
+                    City = "Austin",
+                    State = "TX",
+                    ZipCode = "73301",
+                    Country = "USA",
+                    Notes = "Early adopter, interested in cutting-edge features",
+                    CreatedAt = DateTime.UtcNow.AddDays(-15),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-7)
+                },
+                new Contact
+                {
+                    FirstName = "David",
+                    LastName = "Brown",
+                    Email = "david.brown@smartretail.com",
+                    Phone = "+1-555-0654",
+                    Company = "SmartRetail Co",
+                    JobTitle = "Operations Manager",
+                    Address = "654 Commerce St",
+                    City = "Seattle",
+                    State = "WA",
+                    ZipCode = "98101",
+                    Country = "USA",
+                    Notes = "Focused on efficiency and cost reduction",
+                    CreatedAt = DateTime.UtcNow.AddDays(-10),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-2)
+                }
+            };
+
+            db.Contacts.AddRange(contacts);
+            await db.SaveChangesAsync();
+
+            // Seed leads
+            var leads = new[]
+            {
+                new Lead
+                {
+                    FirstName = "Lisa",
+                    LastName = "Anderson",
+                    Email = "lisa.anderson@newstartup.com",
+                    Phone = "+1-555-0987",
+                    Company = "NewStartup LLC",
+                    JobTitle = "Founder",
+                    Source = "Website",
+                    Status = "New",
+                    EstimatedValue = 15000m,
+                    Notes = "Interested in basic package, just starting out",
+                    CreatedAt = DateTime.UtcNow.AddDays(-5),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-1)
+                },
+                new Lead
+                {
+                    FirstName = "Robert",
+                    LastName = "Taylor",
+                    Email = "robert.taylor@megacorp.com",
+                    Phone = "+1-555-0543",
+                    Company = "MegaCorp Industries",
+                    JobTitle = "IT Director",
+                    Source = "Referral",
+                    Status = "Qualified",
+                    EstimatedValue = 75000m,
+                    Notes = "Large enterprise client, high potential value",
+                    CreatedAt = DateTime.UtcNow.AddDays(-8),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-3)
+                },
+                new Lead
+                {
+                    FirstName = "Jennifer",
+                    LastName = "Garcia",
+                    Email = "jennifer.garcia@brightfuture.com",
+                    Phone = "+1-555-0765",
+                    Company = "BrightFuture LLC",
+                    JobTitle = "Managing Partner",
+                    Source = "Cold Call",
+                    Status = "Contacted",
+                    EstimatedValue = 25000m,
+                    Notes = "Scheduled demo for next week",
+                    CreatedAt = DateTime.UtcNow.AddDays(-12),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-6)
+                },
+                new Lead
+                {
+                    FirstName = "Thomas",
+                    LastName = "Martinez",
+                    Email = "thomas.martinez@datadrive.com",
+                    Phone = "+1-555-0123",
+                    Company = "DataDrive Systems",
+                    JobTitle = "VP of Technology",
+                    Source = "Trade Show",
+                    Status = "New",
+                    EstimatedValue = 45000m,
+                    Notes = "Met at industry conference, very interested",
+                    CreatedAt = DateTime.UtcNow.AddDays(-3),
+                    UpdatedAt = DateTime.UtcNow
+                }
+            };
+
+            db.Leads.AddRange(leads);
+            await db.SaveChangesAsync();
+
+            // Seed opportunities
+            var opportunities = new[]
+            {
+                new Opportunity
+                {
+                    ContactId = contacts[0].Id,
+                    Name = "Enterprise CRM Implementation",
+                    Description = "Full CRM system implementation for Acme Corporation including custom integrations",
+                    Amount = 125000m,
+                    Stage = "Proposal",
+                    Probability = 75,
+                    ExpectedCloseDate = DateTime.UtcNow.AddDays(30),
+                    Notes = "High priority deal, decision expected by month end",
+                    CreatedAt = DateTime.UtcNow.AddDays(-20),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-5)
+                },
+                new Opportunity
+                {
+                    ContactId = contacts[1].Id,
+                    Name = "Cloud Migration Project",
+                    Description = "Migrate TechStart's existing systems to our cloud platform",
+                    Amount = 85000m,
+                    Stage = "Negotiation",
+                    Probability = 60,
+                    ExpectedCloseDate = DateTime.UtcNow.AddDays(45),
+                    Notes = "Technical evaluation in progress",
+                    CreatedAt = DateTime.UtcNow.AddDays(-18),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-8)
+                },
+                new Opportunity
+                {
+                    ContactId = contacts[2].Id,
+                    Name = "Operations Optimization",
+                    Description = "Implement our operations management suite for Global Enterprises",
+                    Amount = 95000m,
+                    Stage = "Qualification",
+                    Probability = 40,
+                    ExpectedCloseDate = DateTime.UtcNow.AddDays(60),
+                    Notes = "Need to demonstrate ROI calculations",
+                    CreatedAt = DateTime.UtcNow.AddDays(-15),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-10)
+                },
+                new Opportunity
+                {
+                    ContactId = contacts[3].Id,
+                    Name = "Innovation Lab Integration",
+                    Description = "Custom integration project for Innovate Labs' research platform",
+                    Amount = 65000m,
+                    Stage = "Prospecting",
+                    Probability = 25,
+                    ExpectedCloseDate = DateTime.UtcNow.AddDays(90),
+                    Notes = "Early stage, building relationship",
+                    CreatedAt = DateTime.UtcNow.AddDays(-12),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-7)
+                },
+                new Opportunity
+                {
+                    ContactId = contacts[4].Id,
+                    Name = "Retail Analytics Platform",
+                    Description = "Deploy analytics and reporting platform for SmartRetail Co",
+                    Amount = 45000m,
+                    Stage = "Closed Won",
+                    Probability = 100,
+                    ExpectedCloseDate = DateTime.UtcNow.AddDays(-5),
+                    Notes = "Deal closed successfully, implementation starting",
+                    CreatedAt = DateTime.UtcNow.AddDays(-25),
+                    UpdatedAt = DateTime.UtcNow.AddDays(-5)
+                }
+            };
+
+            db.Opportunities.AddRange(opportunities);
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log or ignore seeding errors
+            Console.WriteLine($"Error seeding CRM data: {ex.Message}");
+        }
     }
 }
 
@@ -19,6 +292,7 @@ public class CRMRootBlade : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var refreshToken = this.UseRefreshToken();
         
         var contacts = context.Contacts.Include(c => c.Opportunities).ToList();
         var leads = context.Leads.ToList();
@@ -43,17 +317,144 @@ public class CRMRootBlade : ViewBase
                 onClick: _ => blades.Push(this, new OpportunitiesBlade(), "Opportunities"))
         };
         
+        // Calculate metrics
+        var totalPipelineValue = opportunities.Sum(o => o.Amount);
+        var qualifiedLeads = leads.Count(l => l.Status == "Qualified");
+        var activeOpportunities = opportunities.Count(o => o.Stage != "Closed Won" && o.Stage != "Closed Lost");
+        var wonOpportunities = opportunities.Where(o => o.Stage == "Closed Won").Sum(o => o.Amount);
+        
+        // Lead source distribution
+        var leadSourceData = leads
+            .GroupBy(l => l.Source)
+            .Select(g => new { Source = g.Key, Count = g.Count() })
+            .ToArray();
+        
+        // Opportunity stage distribution
+        var opportunityStageData = opportunities
+            .GroupBy(o => o.Stage)
+            .Select(g => new { Stage = g.Key, Count = g.Count(), Value = g.Sum(o => o.Amount) })
+            .ToArray();
+        
+        // Monthly opportunity creation trend
+        var monthlyOpportunities = opportunities
+            .Where(o => o.CreatedAt >= DateTime.UtcNow.AddMonths(-12))
+            .GroupBy(o => new { o.CreatedAt.Year, o.CreatedAt.Month })
+            .Select(g => new { 
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+                Count = g.Count(),
+                Value = g.Sum(o => o.Amount)
+            })
+            .OrderBy(x => x.Month)
+            .ToArray();
+        
+        // Top contacts by opportunity value
+        var topContactsByValue = contacts
+            .Where(c => c.Opportunities.Any())
+            .Select(c => new { 
+                Contact = $"{c.FirstName} {c.LastName}", 
+                Value = c.Opportunities.Sum(o => o.Amount),
+                Count = c.Opportunities.Count
+            })
+            .OrderByDescending(x => x.Value)
+            .Take(5)
+            .ToArray();
+
         return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
-            .Add(Text.H3("CRM Dashboard"))
+            .Gap(4)
+            .Padding(2)
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(Text.H2("CRM Dashboard"))
+                .Add(new Button("+ Add Contact", _ => { })
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
             .Add(Layout.Grid()
-                .Columns(3)
-                .Gap(12)
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Contacts").Add(contacts.Count.ToString())))
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Leads").Add(leads.Count.ToString())))
-                .Add(new Card(Layout.Vertical().Gap(4).Padding(12).Add("Pipeline").Add($"${opportunities.Sum(o => o.Amount):N2}"))))
-            .Add(new List(menuItems));
+                .Columns(4)
+                .Gap(4)
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(2)
+                        .Add(Text.Small("CONTACTS"))
+                        .Add(Text.H2(contacts.Count.ToString()))
+                        .Add(Text.Small($"{contacts.Count(o => o.Opportunities.Any())} with opportunities"))
+                ))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(2)
+                        .Add(Text.Small("LEADS"))
+                        .Add(Text.H2(leads.Count.ToString()))
+                        .Add(Text.Small($"{qualifiedLeads} qualified"))
+                ))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(2)
+                        .Add(Text.Small("OPPORTUNITIES"))
+                        .Add(Text.H2(activeOpportunities.ToString()))
+                        .Add(Text.Small($"${totalPipelineValue:N0} pipeline"))
+                ))
+                .Add(new Card(
+                    Layout.Vertical()
+                        .Gap(2)
+                        .Padding(2)
+                        .Add(Text.Small("REVENUE WON"))
+                        .Add(Text.H2($"${wonOpportunities:N0}"))
+                        .Add(Text.Small("This year"))
+                )))
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(new Card(
+                    leadSourceData.Length > 0
+                        ? leadSourceData.ToPieChart(
+                            e => e.Source,
+                            e => e.Sum(f => f.Count),
+                            PieChartStyles.Donut
+                        )
+                        : Text.Small("No lead data")
+                ).Title("Lead Sources"))
+                .Add(new Card(
+                    opportunityStageData.Length > 0
+                        ? opportunityStageData.ToBarChart()
+                            .Dimension("Stage", e => e.Stage)
+                            .Measure("Count", e => e.Sum(f => f.Count))
+                        : Text.Small("No opportunity data")
+                ).Title("Opportunities by Stage")))
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(new Card(
+                    monthlyOpportunities.Length > 0
+                        ? monthlyOpportunities.ToLineChart(style: LineChartStyles.Dashboard)
+                            .Dimension("Month", e => e.Month)
+                            .Measure("Value", e => e.Sum(f => f.Value))
+                        : Text.Small("No trend data")
+                ).Title("Opportunity Pipeline Trend"))
+                .Add(new Card(
+                    topContactsByValue.Length > 0
+                        ? topContactsByValue.ToBarChart()
+                            .Dimension("Contact", e => e.Contact)
+                            .Measure("Value", e => e.Sum(f => f.Value))
+                        : Text.Small("No contact data")
+                ).Title("Top Contacts by Value")))
+            .Add(new Card(
+                contacts.Count > 0
+                    ? new List(contacts.Take(5).Select(c => new ListItem(
+                        title: $"{c.FirstName} {c.LastName}",
+                        subtitle: $"{c.Company} - {c.Opportunities.Count} opportunities",
+                        icon: Icons.User,
+                        badge: c.Email,
+                        onClick: _ => blades.Push(this, new ContactDetailBlade(c.Id, () => refreshToken.Refresh()), $"{c.FirstName} {c.LastName}")
+                    )))
+                    : Layout.Vertical()
+                        .Gap(2)
+                        .Padding(4)
+                        .Add(Text.H4("No contacts found"))
+                        .Add(Text.P("Add your first contact to get started"))
+            ).Title("Recent Contacts"))
+            .Add(new Card(
+                new List(menuItems)
+            ).Title("Quick Actions"));
     }
 }
 
