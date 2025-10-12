@@ -1013,11 +1013,19 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
         var isEdit = opportunityId.HasValue;
         var existingOpportunity = isEdit ? context.Opportunities.FirstOrDefault(o => o.Id == opportunityId!.Value) : null;
         
-        var contacts = context.Contacts.OrderBy(c => c.LastName).ToList();
+        var contacts = context.Contacts.OrderBy(c => c.LastName).Take(50).ToList();
+        
+        if (contacts.Count == 0 && !isEdit)
+        {
+            // No contacts exist, show message and prevent opportunity creation
+            return Layout.Vertical().Gap(4).Padding(16)
+                .Add(Callout.Error("You must create a contact before creating an opportunity.", "No Contacts Available"))
+                .Add(new Button("Close", _ => onClose?.Invoke()));
+        }
         
         var opportunityForm = this.UseState(existingOpportunity ?? new Opportunity
         {
-            ContactId = contacts.FirstOrDefault()?.Id ?? 0,
+            ContactId = contacts.First().Id,
             Name = "",
             Description = "",
             Amount = 0.00m,
@@ -1038,7 +1046,7 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                         {
                             if (opportunityForm.Value.ContactId == 0)
                             {
-                                client.Toast("Contact is required", "Validation Error");
+                                client.Toast("Please select a contact for this opportunity", "Validation Error");
                                 return;
                             }
                             
