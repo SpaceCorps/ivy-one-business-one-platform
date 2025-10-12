@@ -3,6 +3,14 @@ using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.EmailMarketing;
 
+public static class CampaignStatus
+{
+    public const string Draft = "Draft";
+    public const string Active = "Active";
+    public const string Paused = "Paused";
+    public const string Completed = "Completed";
+}
+
 [App(icon: Icons.Mail, title: "Email Marketing", path: new[] { "Marketing & Communication" })]
 public class EmailMarketingApp : ViewBase
 {
@@ -102,8 +110,8 @@ public class CampaignDetailBlade(int campaignId, Action? onRefresh = null) : Vie
         }, [refreshToken.ToTrigger()]);
         
         var statusBadge = new Badge(campaignData.Value.Status)
-            .Variant(campaignData.Value.Status == "Active" ? BadgeVariant.Success :
-                   campaignData.Value.Status == "Completed" ? BadgeVariant.Primary :
+            .Variant(campaignData.Value.Status == CampaignStatus.Active ? BadgeVariant.Success :
+                   campaignData.Value.Status == CampaignStatus.Completed ? BadgeVariant.Primary :
                    BadgeVariant.Secondary);
 
         var campaignDetails = new
@@ -124,11 +132,11 @@ public class CampaignDetailBlade(int campaignId, Action? onRefresh = null) : Vie
             .Add(campaignDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(campaignData.Value.Status == "Draft" ? new Button("Activate Campaign", _ => {
+                .Add(campaignData.Value.Status == CampaignStatus.Draft ? new Button("Activate Campaign", _ => {
                     var dbCampaign = context.Campaigns.FirstOrDefault(c => c.Id == campaignId);
                     if (dbCampaign != null)
                     {
-                        dbCampaign.Status = "Active";
+                        dbCampaign.Status = CampaignStatus.Active;
                         dbCampaign.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Campaign {campaignData.Value.Name} activated!");
@@ -139,11 +147,11 @@ public class CampaignDetailBlade(int campaignId, Action? onRefresh = null) : Vie
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Play)
                     : null)
-                .Add(campaignData.Value.Status == "Active" ? new Button("Pause Campaign", _ => {
+                .Add(campaignData.Value.Status == CampaignStatus.Active ? new Button("Pause Campaign", _ => {
                     var dbCampaign = context.Campaigns.FirstOrDefault(c => c.Id == campaignId);
                     if (dbCampaign != null)
                     {
-                        dbCampaign.Status = "Paused";
+                        dbCampaign.Status = CampaignStatus.Paused;
                         dbCampaign.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Campaign {campaignData.Value.Name} paused!");
@@ -225,14 +233,14 @@ public class CampaignFormSheet(string campaignType, int? campaignId = null, Acti
             Name = "",
             Description = "",
             Type = campaignType,
-            Status = "Draft",
+            Status = CampaignStatus.Draft,
             StartDate = DateTime.UtcNow,
             EndDate = null,
             Budget = 0.00m,
             TargetAudience = ""
         });
         
-        var statusOptions = new[] { "Draft", "Active", "Paused", "Completed" };
+        var statusOptions = new[] { CampaignStatus.Draft, CampaignStatus.Active, CampaignStatus.Paused, CampaignStatus.Completed };
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)

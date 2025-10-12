@@ -3,6 +3,14 @@ using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.SocialMarketing;
 
+public static class CampaignStatus
+{
+    public const string Draft = "Draft";
+    public const string Active = "Active";
+    public const string Paused = "Paused";
+    public const string Completed = "Completed";
+}
+
 [App(icon: Icons.Heart, title: "Social Marketing", path: new[] { "Marketing & Communication" })]
 public class SocialMarketingApp : ViewBase
 {
@@ -102,8 +110,8 @@ public class SocialCampaignDetailBlade(int campaignId, Action? onRefresh = null)
         }, [refreshToken.ToTrigger()]);
         
         var statusBadge = new Badge(campaignData.Value.Status)
-            .Variant(campaignData.Value.Status == "Active" ? BadgeVariant.Success :
-                   campaignData.Value.Status == "Completed" ? BadgeVariant.Primary :
+            .Variant(campaignData.Value.Status == CampaignStatus.Active ? BadgeVariant.Success :
+                   campaignData.Value.Status == CampaignStatus.Completed ? BadgeVariant.Primary :
                    BadgeVariant.Secondary);
 
         var campaignDetails = new
@@ -123,11 +131,11 @@ public class SocialCampaignDetailBlade(int campaignId, Action? onRefresh = null)
             .Add(campaignDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(campaignData.Value.Status == "Draft" ? new Button("Activate Campaign", _ => {
+                .Add(campaignData.Value.Status == CampaignStatus.Draft ? new Button("Activate Campaign", _ => {
                     var dbCampaign = context.Campaigns.FirstOrDefault(c => c.Id == campaignId);
                     if (dbCampaign != null)
                     {
-                        dbCampaign.Status = "Active";
+                        dbCampaign.Status = CampaignStatus.Active;
                         dbCampaign.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Campaign {campaignData.Value.Name} activated!");
@@ -209,14 +217,14 @@ public class SocialCampaignFormSheet(int? campaignId = null, Action? onClose = n
             Name = "",
             Description = "",
             Type = "Social Media",
-            Status = "Draft",
+            Status = CampaignStatus.Draft,
             StartDate = DateTime.UtcNow,
             EndDate = null,
             Budget = 0.00m,
             TargetAudience = ""
         });
         
-        var statusOptions = new[] { "Draft", "Active", "Paused", "Completed" };
+        var statusOptions = new[] { CampaignStatus.Draft, CampaignStatus.Active, CampaignStatus.Paused, CampaignStatus.Completed };
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
