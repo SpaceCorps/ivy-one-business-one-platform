@@ -345,15 +345,15 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                             employeeForm.Set(updated);
                         }).Placeholder("Software Engineer"))
                         .Add(Text.Small("Department"))
-                        .Add(new SelectInput<string>(departments.FirstOrDefault(d => d.Id == employeeForm.Value.DepartmentId)?.Name ?? "", e => {
-                            var selectedDept = departments.FirstOrDefault(d => d.Name == e.Value);
-                            if (selectedDept != null)
-                            {
+                        .Add(new SelectInput<int>(
+                            employeeForm.Value.DepartmentId,
+                            e => {
                                 var updated = employeeForm.Value;
-                                updated.DepartmentId = selectedDept.Id;
+                                updated.DepartmentId = e.Value;
                                 employeeForm.Set(updated);
-                            }
-                        }, departments.Select(d => d.Name).ToOptions()))
+                            },
+                            departments.Select(d => (d.Id, d.Name)).ToOptions()
+                        ))
                         .Add(Text.Small("Salary ($)"))
                         .Add(new NumberInput<decimal>(employeeForm.Value.Salary, v => {
                             var updated = employeeForm.Value;
