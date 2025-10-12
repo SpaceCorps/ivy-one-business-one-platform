@@ -88,17 +88,24 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
-        this.UseEffect(() =>
+        // Helper function to get current subscription from database
+        Subscription? GetCurrentSubscription() => context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+        
+        // Targeted refresh function - only called when needed
+        void RefreshSubscriptionData()
         {
-            var updatedSubscription = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+            var updatedSubscription = GetCurrentSubscription();
             if (updatedSubscription != null)
             {
                 subscriptionData.Set(updatedSubscription);
             }
-        }, [refreshToken.ToTrigger()]);
+        }
         
-        // Helper function to get current subscription from database
-        Subscription? GetCurrentSubscription() => context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+        // Update local data when refresh token changes (for external updates)
+        this.UseEffect(() =>
+        {
+            RefreshSubscriptionData();
+        }, [refreshToken.ToTrigger()]);
         
         var statusBadge = new Badge(subscriptionData.Value.Status)
             .Variant(subscriptionData.Value.Status == "Active" ? BadgeVariant.Success :
@@ -134,6 +141,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                         dbSubscription.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Subscription for {subscriptionData.Value.CustomerName} cancelled!");
+                        RefreshSubscriptionData();
                         refreshToken.Refresh();
                         onRefresh?.Invoke();
                     }
@@ -149,6 +157,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                         dbSubscription.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Subscription for {subscriptionData.Value.CustomerName} reactivated!");
+                        RefreshSubscriptionData();
                         refreshToken.Refresh();
                         onRefresh?.Invoke();
                     }
@@ -198,6 +207,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                 (Event<Sheet> _) => isEditOpen.Set(false),
                 new SubscriptionFormSheet(subscriptionId, () => {
                     isEditOpen.Set(false);
+                    RefreshSubscriptionData();
                     refreshToken.Refresh();
                     onRefresh?.Invoke();
                 }),
