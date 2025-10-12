@@ -757,7 +757,7 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                             invoiceForm.Set(updated);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Total Amount ($)"))
-                        .Add(Text.Block($"${(invoiceForm.Value.Amount + invoiceForm.Value.TaxAmount):N2}").Variant(TextVariants.Large))
+                        .Add(Text.H3($"${(invoiceForm.Value.Amount + invoiceForm.Value.TaxAmount):N2}"))
                 ).Title("Amounts"))
                 
                 .Add(new Card(
@@ -1104,7 +1104,7 @@ public class TransactionFormSheet(int? transactionId = null, Action? onClose = n
                         .Add(Text.Small("Transaction Type"))
                         .Add(Text.Block(transactionForm.Value.DebitAmount > 0 ? "Debit Transaction" : 
                                       transactionForm.Value.CreditAmount > 0 ? "Credit Transaction" : 
-                                      "No amount entered").Variant(TextVariants.Large))
+                                      "No amount entered"))
                 ).Title("Amounts"))
         );
     }
