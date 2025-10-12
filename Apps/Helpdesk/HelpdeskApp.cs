@@ -337,19 +337,19 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                             ticketForm.Set(cloned);
                         })).Placeholder("HD-001").Disabled(isEdit))
                         .Add(Text.Small("Subject"))
-                        .Add(new TextInput(ticketForm.Value.Subject, async e => {
+                        .Add(new TextInput(ticketForm.Value.Subject, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Subject = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("Issue subject"))
                         .Add(Text.Small("Description"))
-                        .Add(new TextInput(ticketForm.Value.Description, async e => {
+                        .Add(new TextInput(ticketForm.Value.Description, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Description = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Category"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Category, async e => {
+                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Category = e.Value;
                             ticketForm.Set(cloned);
@@ -360,13 +360,13 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
-                        .Add(new TextInput(ticketForm.Value.CustomerName, async e => {
+                        .Add(new TextInput(ticketForm.Value.CustomerName, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.CustomerName = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Customer Email"))
-                        .Add(new TextInput(ticketForm.Value.CustomerEmail, async e => {
+                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.CustomerEmail = e.Value;
                             ticketForm.Set(cloned);
@@ -377,19 +377,19 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Ticket Management"))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<TicketStatus>(ticketForm.Value.Status, async e => {
+                        .Add(new SelectInput<TicketStatus>(ticketForm.Value.Status, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Status = e.Value;
                             ticketForm.Set(cloned);
                         }, statusOptions))
                         .Add(Text.Small("Priority"))
-                        .Add(new SelectInput<TicketPriority>(ticketForm.Value.Priority, async e => {
+                        .Add(new SelectInput<TicketPriority>(ticketForm.Value.Priority, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Priority = e.Value;
                             ticketForm.Set(cloned);
                         }, priorityOptions))
                         .Add(Text.Small("Assigned To"))
-                        .Add(new TextInput(ticketForm.Value.AssignedTo, async e => {
+                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.AssignedTo = e.Value;
                             ticketForm.Set(cloned);
