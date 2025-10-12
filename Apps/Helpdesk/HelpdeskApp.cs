@@ -208,12 +208,22 @@ public class TicketDetailBlade(int ticketId, Action? onRefresh = null) : ViewBas
 
 public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : ViewBase
 {
-    private void UpdateField(IState<Ticket> state, Action<Ticket> updateAction)
+    private Ticket CloneTicket(Ticket source) => new Ticket
     {
-        var updated = state.Value;
-        updateAction(updated);
-        state.Set(updated);
-    }
+        Id = source.Id,
+        TicketNumber = source.TicketNumber,
+        CustomerName = source.CustomerName,
+        CustomerEmail = source.CustomerEmail,
+        Subject = source.Subject,
+        Description = source.Description,
+        Status = source.Status,
+        Priority = source.Priority,
+        Category = source.Category,
+        AssignedTo = source.AssignedTo,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt,
+        ResolvedAt = source.ResolvedAt
+    };
     
     public override object? Build()
     {
@@ -322,53 +332,70 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                         .Add(Text.Small("Ticket Information"))
                         .Add(Text.Small("Ticket Number"))
                         .Add(new TextInput(ticketForm.Value.TicketNumber, e => {
-                            if (!isEdit) UpdateField(ticketForm, t => t.TicketNumber = e.Value);
+                            if (!isEdit) {
+                                var cloned = CloneTicket(ticketForm.Value);
+                                cloned.TicketNumber = e.Value;
+                                ticketForm.Set(cloned);
+                            }
                         }).Placeholder("HD-001").Disabled(isEdit))
                         .Add(Text.Small("Subject"))
-                        .Add(new TextInput(ticketForm.Value.Subject, e => 
-                            UpdateField(ticketForm, t => t.Subject = e.Value)
-                        ).Placeholder("Issue subject"))
+                        .Add(new TextInput(ticketForm.Value.Subject, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.Subject = e.Value;
+                            ticketForm.Set(cloned);
+                        }).Placeholder("Issue subject"))
                         .Add(Text.Small("Description"))
-                        .Add(new TextInput(ticketForm.Value.Description, e => 
-                            UpdateField(ticketForm, t => t.Description = e.Value)
-                        ).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
+                        .Add(new TextInput(ticketForm.Value.Description, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.Description = e.Value;
+                            ticketForm.Set(cloned);
+                        }).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Category"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => 
-                            UpdateField(ticketForm, t => t.Category = e.Value), 
-                            categoryOptions.ToOptions()
-                        ))
+                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.Category = e.Value;
+                            ticketForm.Set(cloned);
+                        }, categoryOptions.ToOptions()))
                 ).Title("Ticket Details"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
-                        .Add(new TextInput(ticketForm.Value.CustomerName, e => 
-                            UpdateField(ticketForm, t => t.CustomerName = e.Value)
-                        ).Placeholder("John Doe"))
+                        .Add(new TextInput(ticketForm.Value.CustomerName, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.CustomerName = e.Value;
+                            ticketForm.Set(cloned);
+                        }).Placeholder("John Doe"))
                         .Add(Text.Small("Customer Email"))
-                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => 
-                            UpdateField(ticketForm, t => t.CustomerEmail = e.Value)
-                        ).Placeholder("customer@example.com"))
+                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.CustomerEmail = e.Value;
+                            ticketForm.Set(cloned);
+                        }).Placeholder("customer@example.com"))
                 ).Title("Customer"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Ticket Management"))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Status, e => 
-                            UpdateField(ticketForm, t => t.Status = e.Value), 
-                            statusOptions.ToOptions()
-                        ))
+                        .Add(new SelectInput<string>(ticketForm.Value.Status, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.Status = e.Value;
+                            ticketForm.Set(cloned);
+                        }, statusOptions.ToOptions()))
                         .Add(Text.Small("Priority"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Priority, e => 
-                            UpdateField(ticketForm, t => t.Priority = e.Value), 
-                            priorityOptions.ToOptions()
-                        ))
+                        .Add(new SelectInput<string>(ticketForm.Value.Priority, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.Priority = e.Value;
+                            ticketForm.Set(cloned);
+                        }, priorityOptions.ToOptions()))
                         .Add(Text.Small("Assigned To"))
-                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => 
-                            UpdateField(ticketForm, t => t.AssignedTo = e.Value)
-                        ).Placeholder("Support Agent"))
+                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.AssignedTo = e.Value;
+                            ticketForm.Set(cloned);
+                        }).Placeholder("Support Agent"))
                 ).Title("Management"))
         );
     }
