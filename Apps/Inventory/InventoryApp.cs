@@ -179,7 +179,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                             {
                                 context.Products.Remove(productToDelete);
                                 context.SaveChanges();
-                                client.Toast($"Product {productData.Value.Name} deleted successfully!");
+                                client.Toast($"Product {productData.Value.Name} deleted successfully!", "Success");
                                 refreshToken.Refresh();
                                 onRefresh?.Invoke();
                                 blades.Pop();
@@ -187,7 +187,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                         }
                         catch (Exception ex)
                         {
-                            client.Toast($"Error deleting product: {ex.Message}", "Error");
+                            client.Error(ex);
                         }
                     }))
                 .Add(new Button("Cancel", _ => blades.Pop())
@@ -292,12 +292,12 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                     }
                     
                     context.SaveChanges();
-                    client.Toast(isEdit ? "Product updated successfully!" : "Product created successfully!");
+                    client.Toast(isEdit ? "Product updated successfully!" : "Product created successfully!", "Success");
                     onClose?.Invoke();
                 }
                 catch (Exception ex)
                 {
-                    client.Toast($"Error: {ex.Message}", "Error");
+                    client.Error(ex);
                 }
             }
         }
@@ -325,34 +325,22 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        var refreshToken = this.UseRefreshToken();
         
         var product = context.Products.FirstOrDefault(p => p.Id == productId);
         
         if (product == null)
         {
-            client.Toast("Product not found", "Error");
+            client.Error(new InvalidOperationException("Product not found"));
             onClose?.Invoke();
             return null;
         }
         
-        // State for recent movements history
-        var recentMovements = this.UseState(context.StockMovements
+        // Get recent stock movements for this product
+        var recentMovements = context.StockMovements
             .Where(sm => sm.ProductId == productId)
-            .OrderByDescending(sm => sm.MovementDate)
+            .OrderByDescending(sm => sm.CreatedAt)
             .Take(10)
-            .ToList());
-        
-        // Update movements list when refresh token changes
-        this.UseEffect(() =>
-        {
-            var updatedMovements = context.StockMovements
-                .Where(sm => sm.ProductId == productId)
-                .OrderByDescending(sm => sm.MovementDate)
-                .Take(10)
-                .ToList();
-            recentMovements.Set(updatedMovements);
-        }, [refreshToken.ToTrigger()]);
+            .ToList();
         
         var adjustmentForm = this.UseState(new StockMovement
         {
@@ -399,21 +387,36 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         var previousStock = dbProduct.QuantityInStock;
                         
                         // Check for insufficient stock on outgoing movements
-                        if (adjustmentForm.Value.MovementType == MovementType.Out && dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
+                        if ((adjustmentForm.Value.MovementType == MovementType.Out || 
+                             adjustmentForm.Value.MovementType == MovementType.Transfer) && 
+                            dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
                         {
-                            client.Toast("Insufficient stock quantity", "Validation Error");
+                            client.Error(new InvalidOperationException(
+                                $"Insufficient stock! Available: {dbProduct.QuantityInStock}, Requested: {adjustmentForm.Value.Quantity}"));
                             return;
                         }
                         
-                        // Adjust stock based on movement type
+                        // Validate that stock won't go negative
+                        var newStockLevel = dbProduct.QuantityInStock;
                         if (adjustmentForm.Value.MovementType == MovementType.In || adjustmentForm.Value.MovementType == MovementType.Adjustment)
                         {
-                            dbProduct.QuantityInStock += adjustmentForm.Value.Quantity;
+                            newStockLevel += adjustmentForm.Value.Quantity;
                         }
                         else if (adjustmentForm.Value.MovementType == MovementType.Out || adjustmentForm.Value.MovementType == MovementType.Transfer)
                         {
-                            dbProduct.QuantityInStock -= adjustmentForm.Value.Quantity;
+                            newStockLevel -= adjustmentForm.Value.Quantity;
                         }
+                        
+                        // Final check to ensure stock doesn't go negative
+                        if (newStockLevel < 0)
+                        {
+                            client.Error(new InvalidOperationException(
+                                $"Operation would result in negative stock! Current: {dbProduct.QuantityInStock}, Change: -{adjustmentForm.Value.Quantity}"));
+                            return;
+                        }
+                        
+                        // Apply stock adjustment
+                        dbProduct.QuantityInStock = newStockLevel;
                         
                         // Record stock movement
                         var stockMovement = new StockMovement
@@ -431,20 +434,19 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         dbProduct.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         
-                        client.Toast($"Stock adjusted successfully! {previousStock} → {dbProduct.QuantityInStock}");
-                        refreshToken.Refresh();
+                        client.Toast($"Stock adjusted successfully! {previousStock} → {dbProduct.QuantityInStock}", "Success");
                         onClose?.Invoke();
                     }
                 }
                 catch (Exception ex)
                 {
-                    client.Toast($"Error: {ex.Message}", "Error");
+                    client.Error(ex);
                 }
             }
         }
         
         // Build movement history cards
-        var movementCards = recentMovements.Value.Select(movement =>
+        var movementCards = recentMovements.Select(movement =>
         {
             var icon = movement.MovementType switch
             {
@@ -515,7 +517,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             : new Badge("In Stock").Variant(BadgeVariant.Success))
                 ).Title("Current Status"))
                 .Add(formView)
-                .Add(recentMovements.Value.Count > 0 
+                .Add(recentMovements.Count > 0 
                     ? Layout.Vertical().Gap(3)
                         .Add(Text.H4("Recent Stock Movements"))
                         .Add(Layout.Vertical().Gap(2).Add(movementCards))
