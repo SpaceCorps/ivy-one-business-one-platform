@@ -313,6 +313,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var refreshToken = this.UseRefreshToken();
         
         var product = context.Products.FirstOrDefault(p => p.Id == productId);
         
@@ -328,8 +329,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
             ProductId = productId,
             MovementType = MovementType.In,
             Quantity = 1,
-            Reference = "",
-            Notes = "",
+            Reference = null,
+            Notes = null,
             MovementDate = DateTime.UtcNow
         });
         
@@ -339,11 +340,12 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
             .Label(m => m.MovementType, "Movement Type")
             .Builder(m => m.MovementType, s => s.ToSelectInput(movementTypeOptions.ToOptions()))
             .Label(m => m.Quantity, "Quantity")
-            .Label(m => m.Reference, "Reference")
+            .Label(m => m.Reference, "Reference (Optional)")
+            .Builder(m => m.Reference, s => s.ToTextInput().Placeholder("Enter reference..."))
             .Label(m => m.MovementDate, "Movement Date")
             .Builder(m => m.MovementDate, s => s.ToDateTimeInput())
-            .Label(m => m.Notes, "Notes")
-            .Builder(m => m.Notes, s => s.ToTextAreaInput())
+            .Label(m => m.Notes, "Notes (Optional)")
+            .Builder(m => m.Notes, s => s.ToTextAreaInput().Placeholder("Add additional notes..."))
             .Remove(m => m.Id)
             .Remove(m => m.ProductId)
             .Remove(m => m.CreatedAt)
@@ -364,6 +366,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                     var dbProduct = context.Products.FirstOrDefault(p => p.Id == productId);
                     if (dbProduct != null)
                     {
+                        var previousStock = dbProduct.QuantityInStock;
+                        
                         // Check for insufficient stock on outgoing movements
                         if (adjustmentForm.Value.MovementType == MovementType.Out && dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
                         {
@@ -376,7 +380,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         {
                             dbProduct.QuantityInStock += adjustmentForm.Value.Quantity;
                         }
-                        else if (adjustmentForm.Value.MovementType == MovementType.Out)
+                        else if (adjustmentForm.Value.MovementType == MovementType.Out || adjustmentForm.Value.MovementType == MovementType.Transfer)
                         {
                             dbProduct.QuantityInStock -= adjustmentForm.Value.Quantity;
                         }
@@ -387,8 +391,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             ProductId = productId,
                             MovementType = adjustmentForm.Value.MovementType,
                             Quantity = adjustmentForm.Value.Quantity,
-                            Reference = adjustmentForm.Value.Reference,
-                            Notes = adjustmentForm.Value.Notes,
+                            Reference = string.IsNullOrWhiteSpace(adjustmentForm.Value.Reference) ? string.Empty : adjustmentForm.Value.Reference,
+                            Notes = string.IsNullOrWhiteSpace(adjustmentForm.Value.Notes) ? string.Empty : adjustmentForm.Value.Notes,
                             MovementDate = adjustmentForm.Value.MovementDate,
                             CreatedAt = DateTime.UtcNow
                         };
@@ -397,8 +401,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         dbProduct.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         
-                        client.Toast($"Stock adjusted successfully! New quantity: {dbProduct.QuantityInStock}");
-                        onClose?.Invoke();
+                        client.Toast($"Stock adjusted successfully! {previousStock} → {dbProduct.QuantityInStock}");
+                        refreshToken.Refresh();
                     }
                 }
                 catch (Exception ex)
@@ -407,6 +411,58 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                 }
             }
         }
+        
+        // Get recent stock movements for this product
+        var recentMovements = context.StockMovements
+            .Where(sm => sm.ProductId == productId)
+            .OrderByDescending(sm => sm.MovementDate)
+            .Take(10)
+            .ToList();
+        
+        var movementCards = recentMovements.Select(movement =>
+        {
+            var icon = movement.MovementType switch
+            {
+                MovementType.In => Icons.ArrowDown,
+                MovementType.Out => Icons.ArrowUp,
+                MovementType.Transfer => Icons.ArrowRight,
+                MovementType.Adjustment => Icons.Wrench,
+                _ => Icons.Package
+            };
+            
+            var badgeVariant = movement.MovementType switch
+            {
+                MovementType.In => BadgeVariant.Success,
+                MovementType.Out => BadgeVariant.Warning,
+                MovementType.Transfer => BadgeVariant.Primary,
+                MovementType.Adjustment => BadgeVariant.Secondary,
+                _ => BadgeVariant.Outline
+            };
+            
+            var details = new List<string>
+            {
+                $"Date: {movement.MovementDate:MMM dd, yyyy HH:mm}"
+            };
+            
+            if (!string.IsNullOrWhiteSpace(movement.Reference))
+                details.Add($"Reference: {movement.Reference}");
+            if (!string.IsNullOrWhiteSpace(movement.Notes))
+                details.Add($"Notes: {movement.Notes}");
+            
+            return new Card(
+                Layout.Vertical()
+                    .Gap(2)
+                    .Padding(3)
+                    .Add(Layout.Horizontal()
+                        .Gap(3)
+                        .Add(new Icon(icon))
+                        .Add(Text.Block($"{movement.MovementType}"))
+                        .Add(new Badge($"Qty: {movement.Quantity}").Variant(badgeVariant)))
+                    .Add(Layout.Vertical()
+                        .Gap(1)
+                        .Add(details.Select(d => Text.Small(d)).ToArray()))
+            );
+        }).ToArray();
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
@@ -434,13 +490,11 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             : new Badge("In Stock").Variant(BadgeVariant.Success))
                 ).Title("Current Status"))
                 .Add(formView)
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("New Stock Level"))
-                        .Add(Text.H3(adjustmentForm.Value.MovementType == MovementType.Out 
-                            ? $"{product.QuantityInStock - adjustmentForm.Value.Quantity}" 
-                            : $"{product.QuantityInStock + adjustmentForm.Value.Quantity}"))
-                ).Title("Preview"))
+                .Add(recentMovements.Count > 0 
+                    ? Layout.Vertical().Gap(3)
+                        .Add(Text.H4("Recent Stock Movements"))
+                        .Add(Layout.Vertical().Gap(2).Add(movementCards))
+                    : Layout.Vertical())
         );
     }
 }
