@@ -77,6 +77,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var (alertView, showAlert) = this.UseAlert();
         
         var initialSubscription = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
         
@@ -166,26 +167,36 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
                     .HandleClick(_ => {
-                        try
-                        {
-                            var subscriptionToDelete = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
-                            if (subscriptionToDelete != null)
-                            {
-                                context.Subscriptions.Remove(subscriptionToDelete);
-                                context.SaveChanges();
-                                client.Toast($"Subscription for {subscriptionData.Value.CustomerName} deleted successfully!");
-                                refreshToken.Refresh();
-                                onRefresh?.Invoke();
-                                blades.Pop();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error deleting subscription: {ex.Message}", "Error");
-                        }
+                        showAlert(
+                            $"Are you sure you want to permanently delete the subscription for {subscriptionData.Value.CustomerName}? This action cannot be undone.",
+                            result => {
+                                if (result == AlertResult.Ok)
+                                {
+                                    try
+                                    {
+                                        var subscriptionToDelete = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+                                        if (subscriptionToDelete != null)
+                                        {
+                                            context.Subscriptions.Remove(subscriptionToDelete);
+                                            context.SaveChanges();
+                                            client.Toast($"Subscription for {subscriptionData.Value.CustomerName} deleted successfully!");
+                                            refreshToken.Refresh();
+                                            onRefresh?.Invoke();
+                                            blades.Pop();
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        client.Toast($"Error deleting subscription: {ex.Message}", "Error");
+                                    }
+                                }
+                            },
+                            "Confirm Deletion"
+                        );
                     }))
                 .Add(new Button("Cancel", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary)))
+            .Add(alertView)
             .Add(isEditOpen.Value ? new Sheet(
                 (Event<Sheet> _) => isEditOpen.Set(false),
                 new SubscriptionFormSheet(subscriptionId, () => {
