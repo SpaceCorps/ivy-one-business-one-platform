@@ -18,10 +18,10 @@ public class StockMovement
     public int Quantity { get; set; }
     
     [MaxLength(200)]
-    public string? Reference { get; set; } = string.Empty;
+    public string? Reference { get; set; }
     
     [MaxLength(1000)]
-    public string? Notes { get; set; } = string.Empty;
+    public string? Notes { get; set; }
     
     public DateTime MovementDate { get; set; }
     

@@ -435,8 +435,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             ProductId = productId,
                             MovementType = adjustmentForm.Value.MovementType,
                             Quantity = adjustmentForm.Value.Quantity,
-                            Reference = string.IsNullOrWhiteSpace(adjustmentForm.Value.Reference) ? string.Empty : adjustmentForm.Value.Reference,
-                            Notes = string.IsNullOrWhiteSpace(adjustmentForm.Value.Notes) ? string.Empty : adjustmentForm.Value.Notes,
+                            Reference = string.IsNullOrWhiteSpace(adjustmentForm.Value.Reference) ? null : adjustmentForm.Value.Reference,
+                            Notes = string.IsNullOrWhiteSpace(adjustmentForm.Value.Notes) ? null : adjustmentForm.Value.Notes,
                             MovementDate = adjustmentForm.Value.MovementDate,
                             CreatedAt = DateTime.UtcNow
                         };
