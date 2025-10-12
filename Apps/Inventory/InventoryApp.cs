@@ -363,7 +363,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
             MovementDate = DateTime.UtcNow
         });
         
-        var movementTypeOptions = new[] { MovementType.In, MovementType.Out, MovementType.Transfer, MovementType.Adjustment };
+        var movementTypeOptions = new[] { MovementType.In, MovementType.Out, MovementType.Transfer };
         
         var formBuilder = adjustmentForm.ToForm("Adjust Stock")
             .Label(m => m.MovementType, "Movement Type")
@@ -407,9 +407,9 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             return;
                         }
                         
-                        // Validate that stock won't go negative
+                        // Calculate new stock level based on movement type
                         var newStockLevel = dbProduct.QuantityInStock;
-                        if (adjustmentForm.Value.MovementType == MovementType.In || adjustmentForm.Value.MovementType == MovementType.Adjustment)
+                        if (adjustmentForm.Value.MovementType == MovementType.In)
                         {
                             newStockLevel += adjustmentForm.Value.Quantity;
                         }
@@ -464,7 +464,6 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                 MovementType.In => Icons.ArrowDown,
                 MovementType.Out => Icons.ArrowUp,
                 MovementType.Transfer => Icons.ArrowRight,
-                MovementType.Adjustment => Icons.Wrench,
                 _ => Icons.Package
             };
             
@@ -473,7 +472,6 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                 MovementType.In => BadgeVariant.Success,
                 MovementType.Out => BadgeVariant.Warning,
                 MovementType.Transfer => BadgeVariant.Primary,
-                MovementType.Adjustment => BadgeVariant.Secondary,
                 _ => BadgeVariant.Outline
             };
             
