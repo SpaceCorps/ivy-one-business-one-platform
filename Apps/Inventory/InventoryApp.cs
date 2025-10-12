@@ -48,7 +48,8 @@ public class InventoryRootBlade : ViewBase
             title: $"{prod.ProductCode} - {prod.Name}",
             subtitle: $"Stock: {prod.QuantityInStock} - ${prod.Price:N2} - {prod.Category}",
             icon: Icons.Package,
-            badge: prod.QuantityInStock < prod.MinimumStockLevel ? "Low Stock" : $"{prod.QuantityInStock}",
+            badge: prod.QuantityInStock == 0 ? "Out of Stock" : 
+                   prod.QuantityInStock < prod.MinimumStockLevel ? "Low Stock" : "In Stock",
             onClick: _ => { blades.Push(this, new ProductDetailBlade(prod.Id, () => refreshToken.Refresh()), prod.Name); return default; }
         ));
         
@@ -103,8 +104,12 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
             }
         }, [refreshToken.ToTrigger()]);
         
-        var stockBadge = new Badge(productData.Value.QuantityInStock < productData.Value.MinimumStockLevel ? "Low Stock" : "In Stock")
-            .Variant(productData.Value.QuantityInStock < productData.Value.MinimumStockLevel ? BadgeVariant.Destructive : BadgeVariant.Success);
+        var stockBadge = new Badge(
+            productData.Value.QuantityInStock == 0 ? "Out of Stock" : 
+            productData.Value.QuantityInStock < productData.Value.MinimumStockLevel ? "Low Stock" : "In Stock")
+            .Variant(
+                productData.Value.QuantityInStock == 0 ? BadgeVariant.Destructive :
+                productData.Value.QuantityInStock < productData.Value.MinimumStockLevel ? BadgeVariant.Warning : BadgeVariant.Success);
 
         var productDetails = new
         {
@@ -214,8 +219,7 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
             .Label(m => m.Cost, "Cost ($)")
             .Label(m => m.QuantityInStock, "Quantity in Stock")
             .Label(m => m.MinimumStockLevel, "Minimum Stock Level")
-            .Label(m => m.IsActive, "Status")
-            .Builder(m => m.IsActive, s => s.ToSelectInput(new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
+            .Label(m => m.IsActive, "Active Status")
             .Remove(m => m.Id)
             .Remove(m => m.CreatedAt)
             .Remove(m => m.UpdatedAt)
@@ -423,8 +427,10 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         .Add(Text.Small("Current Stock Information"))
                         .Add(Text.Block($"Product: {product.Name}"))
                         .Add(Text.Block($"Current Stock: {product.QuantityInStock}"))
-                        .Add(product.QuantityInStock < product.MinimumStockLevel 
-                            ? new Badge("Low Stock").Variant(BadgeVariant.Destructive) 
+                        .Add(product.QuantityInStock == 0 
+                            ? new Badge("Out of Stock").Variant(BadgeVariant.Destructive)
+                            : product.QuantityInStock < product.MinimumStockLevel 
+                            ? new Badge("Low Stock").Variant(BadgeVariant.Warning) 
                             : new Badge("In Stock").Variant(BadgeVariant.Success))
                 ).Title("Current Status"))
                 .Add(formView)
