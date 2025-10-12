@@ -95,13 +95,23 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
         var productData = this.UseState(initialProduct);
         var refreshToken = this.UseRefreshToken();
         
-        this.UseEffect(() =>
+        // Helper function to get current product from database
+        Product? GetCurrentProduct() => context.Products.FirstOrDefault(p => p.Id == productId);
+        
+        // Targeted refresh function - only called when needed
+        void RefreshProductData()
         {
-            var updatedProduct = context.Products.FirstOrDefault(p => p.Id == productId);
+            var updatedProduct = GetCurrentProduct();
             if (updatedProduct != null)
             {
                 productData.Set(updatedProduct);
             }
+        }
+        
+        // Update local data when refresh token changes (for external updates)
+        this.UseEffect(() =>
+        {
+            RefreshProductData();
         }, [refreshToken.ToTrigger()]);
         
         var stockBadge = new Badge(
@@ -137,6 +147,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                     .Icon(Icons.Package)
                     .WithSheet(
                         () => new StockAdjustmentSheet(productId, () => {
+                            RefreshProductData();
                             refreshToken.Refresh();
                             onRefresh?.Invoke();
                         }),
@@ -149,6 +160,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                     .Icon(Icons.Pencil)
                     .WithSheet(
                         () => new ProductFormSheet(productId, () => {
+                            RefreshProductData();
                             refreshToken.Refresh();
                             onRefresh?.Invoke();
                         }),
@@ -162,7 +174,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                     .HandleClick(_ => {
                         try
                         {
-                            var productToDelete = context.Products.FirstOrDefault(p => p.Id == productId);
+                            var productToDelete = GetCurrentProduct();
                             if (productToDelete != null)
                             {
                                 context.Products.Remove(productToDelete);
@@ -324,6 +336,24 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
             return null;
         }
         
+        // State for recent movements history
+        var recentMovements = this.UseState(context.StockMovements
+            .Where(sm => sm.ProductId == productId)
+            .OrderByDescending(sm => sm.MovementDate)
+            .Take(10)
+            .ToList());
+        
+        // Update movements list when refresh token changes
+        this.UseEffect(() =>
+        {
+            var updatedMovements = context.StockMovements
+                .Where(sm => sm.ProductId == productId)
+                .OrderByDescending(sm => sm.MovementDate)
+                .Take(10)
+                .ToList();
+            recentMovements.Set(updatedMovements);
+        }, [refreshToken.ToTrigger()]);
+        
         var adjustmentForm = this.UseState(new StockMovement
         {
             ProductId = productId,
@@ -403,6 +433,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         
                         client.Toast($"Stock adjusted successfully! {previousStock} → {dbProduct.QuantityInStock}");
                         refreshToken.Refresh();
+                        onClose?.Invoke();
                     }
                 }
                 catch (Exception ex)
@@ -412,14 +443,8 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
             }
         }
         
-        // Get recent stock movements for this product
-        var recentMovements = context.StockMovements
-            .Where(sm => sm.ProductId == productId)
-            .OrderByDescending(sm => sm.MovementDate)
-            .Take(10)
-            .ToList();
-        
-        var movementCards = recentMovements.Select(movement =>
+        // Build movement history cards
+        var movementCards = recentMovements.Value.Select(movement =>
         {
             var icon = movement.MovementType switch
             {
@@ -490,7 +515,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             : new Badge("In Stock").Variant(BadgeVariant.Success))
                 ).Title("Current Status"))
                 .Add(formView)
-                .Add(recentMovements.Count > 0 
+                .Add(recentMovements.Value.Count > 0 
                     ? Layout.Vertical().Gap(3)
                         .Add(Text.H4("Recent Stock Movements"))
                         .Add(Layout.Vertical().Gap(2).Add(movementCards))
