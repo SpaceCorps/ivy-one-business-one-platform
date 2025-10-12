@@ -3,6 +3,18 @@ using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.Project;
 
+public static class TaskHelper
+{
+    public static string GetPriorityLabel(int priority) => priority switch
+    {
+        1 => "Low",
+        2 => "Medium",
+        3 => "High",
+        4 => "Critical",
+        _ => "Unknown"
+    };
+}
+
 [App(icon: Icons.Check, title: "Project", path: new[] { "Project & Time Management" })]
 public class ProjectApp : ViewBase
 {
@@ -123,7 +135,7 @@ public class ProjectDetailBlade(int projectId, Action? onRefresh = null) : ViewB
         
         var taskItems = projectData.Value.Tasks.Select(task => new ListItem(
             title: task.Name,
-            subtitle: $"{task.Status} - Priority: {GetPriorityLabel(task.Priority)} - {task.Assignee}",
+            subtitle: $"{task.Status} - Priority: {TaskHelper.GetPriorityLabel(task.Priority)} - {task.Assignee}",
             icon: Icons.Check,
             badge: task.Status,
             onClick: _ => blades.Push(this, new TaskDetailBlade(task.Id, () => refreshToken.Refresh()), task.Name)
@@ -191,15 +203,6 @@ public class ProjectDetailBlade(int projectId, Action? onRefresh = null) : ViewB
                 description: "Add a new task to this project"
             ).Width(Size.Fraction(1/3f)) : null);
     }
-    
-    private string GetPriorityLabel(int priority) => priority switch
-    {
-        1 => "Low",
-        2 => "Medium",
-        3 => "High",
-        4 => "Critical",
-        _ => "Unknown"
-    };
 }
 
 public class TaskDetailBlade(int taskId, Action? onRefresh = null) : ViewBase
@@ -245,7 +248,7 @@ public class TaskDetailBlade(int taskId, Action? onRefresh = null) : ViewBase
             Description = taskData.Value.Description,
             Project = taskData.Value.Project.Name,
             Assignee = taskData.Value.Assignee,
-            Priority = GetPriorityLabel(taskData.Value.Priority),
+            Priority = TaskHelper.GetPriorityLabel(taskData.Value.Priority),
             DueDate = taskData.Value.DueDate?.ToString("MMM dd, yyyy"),
             Status = statusBadge
         };
@@ -295,15 +298,6 @@ public class TaskDetailBlade(int taskId, Action? onRefresh = null) : ViewBase
                 description: $"Edit task {taskData.Value.Name}"
             ).Width(Size.Fraction(1/3f)) : null);
     }
-    
-    private string GetPriorityLabel(int priority) => priority switch
-    {
-        1 => "Low",
-        2 => "Medium",
-        3 => "High",
-        4 => "Critical",
-        _ => "Unknown"
-    };
 }
 
 public class ProjectFormSheet(int? projectId = null, Action? onClose = null) : ViewBase
