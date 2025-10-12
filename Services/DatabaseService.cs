@@ -76,9 +76,9 @@ public static class DatabaseService
                 WorkOrderNumber = "WO-001",
                 ProductName = "Widget A",
                 Quantity = 500,
-                Status = "In Production",
+                Status = WorkOrderStatus.InProduction,
                 Progress = 75,
-                Priority = "High",
+                Priority = WorkOrderPriority.High,
                 PlannedStartDate = DateTime.UtcNow.AddDays(-5),
                 PlannedEndDate = DateTime.UtcNow.AddDays(5),
                 StartDate = DateTime.UtcNow.AddDays(-3),
@@ -89,9 +89,9 @@ public static class DatabaseService
                 WorkOrderNumber = "WO-002",
                 ProductName = "Component B",
                 Quantity = 1000,
-                Status = "Scheduled",
+                Status = WorkOrderStatus.Scheduled,
                 Progress = 0,
-                Priority = "Normal",
+                Priority = WorkOrderPriority.Normal,
                 PlannedStartDate = DateTime.UtcNow.AddDays(2),
                 PlannedEndDate = DateTime.UtcNow.AddDays(10),
                 Notes = "Standard component production run"
@@ -101,9 +101,9 @@ public static class DatabaseService
                 WorkOrderNumber = "WO-003",
                 ProductName = "Assembly C",
                 Quantity = 250,
-                Status = "Completed",
+                Status = WorkOrderStatus.Completed,
                 Progress = 100,
-                Priority = "Normal",
+                Priority = WorkOrderPriority.Normal,
                 PlannedStartDate = DateTime.UtcNow.AddDays(-10),
                 PlannedEndDate = DateTime.UtcNow.AddDays(-2),
                 StartDate = DateTime.UtcNow.AddDays(-9),
@@ -114,9 +114,9 @@ public static class DatabaseService
                 WorkOrderNumber = "WO-004",
                 ProductName = "Custom Part D",
                 Quantity = 100,
-                Status = "Scheduled",
+                Status = WorkOrderStatus.Scheduled,
                 Progress = 0,
-                Priority = "Urgent",
+                Priority = WorkOrderPriority.Urgent,
                 PlannedStartDate = DateTime.UtcNow,
                 PlannedEndDate = DateTime.UtcNow.AddDays(3),
                 Notes = "Urgent custom order - expedite shipping"
@@ -165,6 +165,18 @@ public static class DatabaseService
         };
 
         await context.PurchaseOrders.AddRangeAsync(purchaseOrders);
+        await context.SaveChangesAsync();
+        
+        // Seed tickets
+        var tickets = new[]
+        {
+            new Ticket { TicketNumber = "HD-001", CustomerName = "John Doe", CustomerEmail = "john.doe@example.com", Subject = "Login Issue", Description = "Unable to login to the system", Status = TicketStatus.Open, Priority = TicketPriority.High, Category = "Technical", CreatedAt = DateTime.UtcNow.AddDays(-5) },
+            new Ticket { TicketNumber = "HD-002", CustomerName = "Jane Smith", CustomerEmail = "jane.smith@example.com", Subject = "Feature Request", Description = "Request for new reporting feature", Status = TicketStatus.InProgress, Priority = TicketPriority.Medium, Category = "Feature", AssignedTo = "Support Agent", CreatedAt = DateTime.UtcNow.AddDays(-3) },
+            new Ticket { TicketNumber = "HD-003", CustomerName = "Bob Johnson", CustomerEmail = "bob.johnson@example.com", Subject = "Bug Report", Description = "Found a bug in the invoice module", Status = TicketStatus.Resolved, Priority = TicketPriority.Low, Category = "Bug", AssignedTo = "Tech Support", ResolvedAt = DateTime.UtcNow.AddDays(-1), CreatedAt = DateTime.UtcNow.AddDays(-7) },
+            new Ticket { TicketNumber = "HD-004", CustomerName = "Alice Brown", CustomerEmail = "alice.brown@example.com", Subject = "Password Reset", Description = "Need help resetting my password", Status = TicketStatus.Closed, Priority = TicketPriority.Low, Category = "Account", AssignedTo = "Support Agent", ResolvedAt = DateTime.UtcNow.AddDays(-2), CreatedAt = DateTime.UtcNow.AddDays(-8) }
+        };
+        
+        await context.Tickets.AddRangeAsync(tickets);
         await context.SaveChangesAsync();
     }
 }

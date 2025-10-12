@@ -30,20 +30,19 @@ public class ManufacturingRootBlade : ViewBase
             .Where(wo => string.IsNullOrEmpty(searchTerm.Value) ||
                         wo.WorkOrderNumber.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
                         wo.ProductName.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
-                        wo.Status.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase))
+                        wo.Status.ToString().Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase))
             .ToList();
         
         var listItems = filteredWorkOrders.Select(wo => new ListItem(
             title: $"{wo.WorkOrderNumber} - {wo.ProductName}",
             subtitle: $"Qty: {wo.Quantity} - {wo.Progress}% complete",
-            icon: Icons.Settings,
-            badge: wo.Status,
+            badge: wo.Status.ToString(),
             onClick: _ => { blades.Push(this, new WorkOrderDetailBlade(wo.Id), wo.WorkOrderNumber); return default; }
         ));
         
         return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(8)
+                .Gap(4)
                 .Add(searchTerm.ToTextInput().Placeholder("Search work orders..."))
                 .Add(new Button("New Work Order")
                     .Icon(Icons.Plus)
@@ -77,15 +76,15 @@ public class CreateWorkOrderSheet : ViewBase
         var workOrderNumber = this.UseState($"WO-{DateTime.UtcNow:yyyyMMddHHmmss}");
         var productName = this.UseState("");
         var quantity = this.UseState("0");
-        var priority = this.UseState("Normal");
+        var priority = this.UseState(WorkOrderPriority.Normal);
         var plannedStartDate = this.UseState(DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-dd"));
         var plannedEndDate = this.UseState(DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd"));
         var notes = this.UseState("");
 
-        var priorities = new[] { "Low", "Normal", "High", "Urgent" };
+        var priorities = Enum.GetValues<WorkOrderPriority>().Select(p => new Option<WorkOrderPriority>(p.ToString(), p)).ToArray();
 
         return new FooterLayout(
-            Layout.Horizontal().Gap(8)
+            Layout.Horizontal().Gap(4)
                 .Add(new Button("Create", _ => {
                     if (string.IsNullOrWhiteSpace(productName.Value))
                     {
@@ -104,7 +103,7 @@ public class CreateWorkOrderSheet : ViewBase
                         WorkOrderNumber = workOrderNumber.Value,
                         ProductName = productName.Value,
                         Quantity = qty,
-                        Status = "Scheduled",
+                        Status = WorkOrderStatus.Scheduled,
                         Progress = 0,
                         Priority = priority.Value,
                         PlannedStartDate = DateTime.Parse(plannedStartDate.Value),
@@ -123,10 +122,10 @@ public class CreateWorkOrderSheet : ViewBase
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)),
             Layout.Vertical()
-                .Gap(16)
+                .Gap(4)
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Work Order Number"))
                         .Add(workOrderNumber.ToTextInput().Placeholder("WO-001").Disabled(true))
                         .Add(Text.Small("Product Name *"))
@@ -134,11 +133,11 @@ public class CreateWorkOrderSheet : ViewBase
                         .Add(Text.Small("Quantity *"))
                         .Add(quantity.ToTextInput().Placeholder("Enter quantity"))
                         .Add(Text.Small("Priority"))
-                        .Add(priority.ToSelectInput(priorities.Select(p => new Option<string>(p, p)).ToArray()))
+                        .Add(priority.ToSelectInput(priorities))
                 ).Title("Basic Information"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Planned Start Date"))
                         .Add(plannedStartDate.ToDateInput().Placeholder("YYYY-MM-DD"))
                         .Add(Text.Small("Planned End Date"))
@@ -146,7 +145,7 @@ public class CreateWorkOrderSheet : ViewBase
                 ).Title("Schedule"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Notes (Optional)"))
                         .Add(notes.ToTextInput().Placeholder("Add any additional notes..."))
                 ).Title("Additional Information"))
@@ -171,20 +170,20 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
             return "Work order not found";
         
         return Layout.Vertical()
-            .Gap(16)
+            .Gap(4)
             .Add(new Card(
                 Layout.Vertical()
-                    .Gap(12)
+                    .Gap(4)
                     .Add(Layout.Horizontal()
-                        .Gap(8)
-                        .Add(new Badge(workOrder.Status)
-                            .Variant(workOrder.Status == "Completed" ? BadgeVariant.Success :
-                                   workOrder.Status == "In Production" ? BadgeVariant.Primary :
-                                   workOrder.Status == "Cancelled" ? BadgeVariant.Destructive :
+                        .Gap(4)
+                        .Add(new Badge(workOrder.Status.ToString())
+                            .Variant(workOrder.Status == WorkOrderStatus.Completed ? BadgeVariant.Success :
+                                   workOrder.Status == WorkOrderStatus.InProduction ? BadgeVariant.Primary :
+                                   workOrder.Status == WorkOrderStatus.Cancelled ? BadgeVariant.Destructive :
                                    BadgeVariant.Secondary))
-                        .Add(new Badge(workOrder.Priority)
-                            .Variant(workOrder.Priority == "Urgent" ? BadgeVariant.Destructive :
-                                   workOrder.Priority == "High" ? BadgeVariant.Warning :
+                        .Add(new Badge(workOrder.Priority.ToString())
+                            .Variant(workOrder.Priority == WorkOrderPriority.Urgent ? BadgeVariant.Destructive :
+                                   workOrder.Priority == WorkOrderPriority.High ? BadgeVariant.Warning :
                                    BadgeVariant.Outline)))
                     .Add(new Progress(workOrder.Progress))
             ).Title(workOrder.WorkOrderNumber))
@@ -192,8 +191,8 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                 new {
                     ProductName = workOrder.ProductName,
                     Quantity = workOrder.Quantity,
-                    Priority = workOrder.Priority,
-                    Status = workOrder.Status,
+                    Priority = workOrder.Priority.ToString(),
+                    Status = workOrder.Status.ToString(),
                     Progress = $"{workOrder.Progress}%",
                     Created = workOrder.CreatedAt.ToString("MMM dd, yyyy"),
                     PlannedStart = workOrder.PlannedStartDate.ToString("MMM dd, yyyy"),
@@ -208,15 +207,15 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
             ).Title("Work Order Details"))
             .Add(new Card(
                 Layout.Horizontal()
-                    .Gap(8)
+                    .Gap(4)
                     .Wrap(true)
-                    // Start Production - тільки для Scheduled
-                    .Add(workOrder.Status == "Scheduled" 
-                        ? new Button("Start Production", _ => {
+                    .Add(workOrder.Status == WorkOrderStatus.Scheduled
+                        ? new Button("Start Production", _ =>
+                        {
                             var wo = context.WorkOrders.Find(workOrderId);
                             if (wo != null)
                             {
-                                wo.Status = "In Production";
+                                wo.Status = WorkOrderStatus.InProduction;
                                 wo.StartDate = DateTime.UtcNow;
                                 context.SaveChanges();
                                 refresh.Value++;
@@ -224,11 +223,9 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             }
                             return default;
                         })
-                            .Icon(Icons.Play)
                             .Variant(ButtonVariant.Primary)
                         : null)
-                    // Update Progress - для Scheduled і In Production
-                    .Add(workOrder.Status != "Completed" && workOrder.Status != "Cancelled"
+                    .Add(workOrder.Status != WorkOrderStatus.Completed && workOrder.Status != WorkOrderStatus.Cancelled
                         ? new Button("Update Progress")
                             .Icon(Icons.TrendingUp)
                             .Variant(ButtonVariant.Secondary)
@@ -236,16 +233,16 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                                 () => new UpdateProgressSheet(workOrderId, refresh, context, client),
                                 title: "Update Progress",
                                 description: $"Update progress for {workOrder.WorkOrderNumber}",
-                                width: Size.Fraction(1/3f)
+                                width: Size.Fraction(1 / 3f)
                             )
                         : null)
-                    // Complete - тільки для In Production
-                    .Add(workOrder.Status == "In Production" 
-                        ? new Button("Complete", _ => {
+                    .Add(workOrder.Status == WorkOrderStatus.InProduction
+                        ? new Button("Complete", _ =>
+                        {
                             var wo = context.WorkOrders.Find(workOrderId);
                             if (wo != null)
                             {
-                                wo.Status = "Completed";
+                                wo.Status = WorkOrderStatus.Completed;
                                 wo.Progress = 100;
                                 wo.CompletionDate = DateTime.UtcNow;
                                 context.SaveChanges();
@@ -254,16 +251,15 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             }
                             return default;
                         })
-                            .Icon(Icons.Check)
-                            .Variant(ButtonVariant.Success)
+                            .Variant(ButtonVariant.Primary)
                         : null)
-                    // Cancel - для всіх крім Completed і Cancelled
-                    .Add(workOrder.Status != "Completed" && workOrder.Status != "Cancelled"
-                        ? new Button("Cancel Order", _ => {
+                    .Add(workOrder.Status != WorkOrderStatus.Completed && workOrder.Status != WorkOrderStatus.Cancelled
+                        ? new Button("Cancel Order", _ =>
+                        {
                             var wo = context.WorkOrders.Find(workOrderId);
                             if (wo != null)
                             {
-                                wo.Status = "Cancelled";
+                                wo.Status = WorkOrderStatus.Cancelled;
                                 context.SaveChanges();
                                 refresh.Value++;
                                 client.Toast($"Work order {wo.WorkOrderNumber} cancelled");
@@ -273,13 +269,14 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             .Icon(Icons.X)
                             .Variant(ButtonVariant.Destructive)
                         : null)
+                        
                     // Reopen - тільки для Completed або Cancelled
-                    .Add(workOrder.Status == "Completed" || workOrder.Status == "Cancelled"
+                    .Add(workOrder.Status == WorkOrderStatus.Completed || workOrder.Status == WorkOrderStatus.Cancelled
                         ? new Button("Reopen", _ => {
                             var wo = context.WorkOrders.Find(workOrderId);
                             if (wo != null)
                             {
-                                wo.Status = wo.Progress > 0 ? "In Production" : "Scheduled";
+                                wo.Status = wo.Progress > 0 ? WorkOrderStatus.InProduction : WorkOrderStatus.Scheduled;
                                 wo.CompletionDate = null;
                                 context.SaveChanges();
                                 refresh.Value++;
@@ -290,6 +287,22 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             .Icon(Icons.RotateCcw)
                             .Variant(ButtonVariant.Outline)
                         : null)
+                    // Delete - available for all work orders
+                    .Add(new Button("Delete", _ => {
+                        var wo = context.WorkOrders.Find(workOrderId);
+                        var blades = this.UseContext<IBladeController>();
+                        if (wo != null)
+                        {
+                            var woNumber = wo.WorkOrderNumber;
+                            context.WorkOrders.Remove(wo);
+                            context.SaveChanges();
+                            client.Toast($"Work order {woNumber} deleted successfully!");
+                            blades.Pop(this, true);
+                        }
+                        return default;
+                    })
+                        .Icon(Icons.Trash)
+                        .Variant(ButtonVariant.Destructive))
             ).Title("Actions"));
     }
 }
@@ -319,7 +332,7 @@ public class UpdateProgressSheet : ViewBase
         var notes = this.UseState(workOrder.Notes ?? "");
 
         return new FooterLayout(
-            Layout.Horizontal().Gap(8)
+            Layout.Horizontal().Gap(4)
                 .Add(new Button("Update", _ => {
                     if (!int.TryParse(progress.Value, out var progressValue) || progressValue < 0 || progressValue > 100)
                     {
@@ -334,14 +347,14 @@ public class UpdateProgressSheet : ViewBase
                         wo.Notes = string.IsNullOrWhiteSpace(notes.Value) ? null : notes.Value;
 
                         // Auto-update status based on progress
-                        if (progressValue == 100 && wo.Status != "Completed")
+                        if (progressValue == 100 && wo.Status != WorkOrderStatus.Completed)
                         {
-                            wo.Status = "Completed";
+                            wo.Status = WorkOrderStatus.Completed;
                             wo.CompletionDate = DateTime.UtcNow;
                         }
-                        else if (progressValue > 0 && wo.Status == "Scheduled")
+                        else if (progressValue > 0 && wo.Status == WorkOrderStatus.Scheduled)
                         {
-                            wo.Status = "In Production";
+                            wo.Status = WorkOrderStatus.InProduction;
                             wo.StartDate = DateTime.UtcNow;
                         }
 
@@ -355,24 +368,24 @@ public class UpdateProgressSheet : ViewBase
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)),
             Layout.Vertical()
-                .Gap(16)
+                .Gap(4)
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Current Progress"))
                         .Add(new Progress(workOrder.Progress))
                         .Add(Text.Small($"{workOrder.Progress}% Complete"))
                 ).Title("Current Status"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("New Progress (0-100) *"))
                         .Add(progress.ToTextInput().Placeholder("Enter progress percentage"))
                         .Add(Text.Muted("Enter a value between 0 and 100"))
                 ).Title("Update Progress"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Notes (Optional)"))
                         .Add(notes.ToTextInput().Placeholder("Add update notes..."))
                 ).Title("Additional Notes"))
