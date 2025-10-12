@@ -366,7 +366,7 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
         
         var categories = context.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToList();
         
-        var articleForm = this.UseState(existingArticle ?? new Article
+        var articleForm = this.UseState(existingArticle ?? new Data.Article
         {
             Title = "",
             Content = "",
@@ -416,7 +416,7 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
                             }
                             else
                             {
-                                var newArticle = new Article
+                                var newArticle = new Data.Article
                                 {
                                     Title = articleForm.Value.Title,
                                     Content = articleForm.Value.Content,
@@ -581,104 +581,5 @@ public class CategoryFormSheet(int? categoryId = null, Action? onClose = null) :
                         }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
                 ).Title("Category Details"))
         );
-    }
-}
-
-public class CategoryDetailBlade(int categoryId, Action? onRefresh = null) : ViewBase
-{
-    public override object? Build()
-    {
-        var client = this.UseService<IClientProvider>();
-        var context = this.UseService<ApplicationDbContext>();
-        var blades = this.UseContext<IBladeController>();
-        
-        var initialCategory = context.Categories.Include(c => c.Articles).FirstOrDefault(c => c.Id == categoryId);
-        
-        if (initialCategory == null)
-        {
-            return Layout.Vertical()
-                .Gap(4)
-                .Add(Text.H3("Category Not Found"))
-                .Add(new Button("Go Back", _ => blades.Pop())
-                    .Variant(ButtonVariant.Secondary));
-        }
-        
-        var categoryData = this.UseState(initialCategory);
-        var isEditOpen = this.UseState(false);
-        var refreshToken = this.UseRefreshToken();
-        
-        this.UseEffect(() =>
-        {
-            var updatedCategory = context.Categories.Include(c => c.Articles).FirstOrDefault(c => c.Id == categoryId);
-            if (updatedCategory != null)
-            {
-                categoryData.Set(updatedCategory);
-            }
-        }, [refreshToken.ToTrigger()]);
-        
-        var categoryDetails = new
-        {
-            Name = categoryData.Value.Name,
-            Description = categoryData.Value.Description,
-            ArticlesCount = $"{categoryData.Value.Articles.Count} articles",
-            Status = categoryData.Value.IsActive ? "Active" : "Inactive"
-        };
-        
-        var articleItems = categoryData.Value.Articles.Select(article => new ListItem(
-            title: article.Title,
-            subtitle: $"{article.ViewCount} views - By {article.Author}",
-            icon: Icons.FileText,
-            badge: article.Status,
-            onClick: _ => blades.Push(this, new ArticleDetailBlade(article.Id, () => refreshToken.Refresh()), article.Title)
-        ));
-        
-        return Layout.Vertical()
-            .Gap(4)
-            .Add(Text.H3(categoryData.Value.Name))
-            .Add(categoryDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
-            .Add(Layout.Horizontal()
-                .Gap(4)
-                .Add(new Button("Edit Category")
-                    .Variant(ButtonVariant.Outline)
-                    .Icon(Icons.Pencil)
-                    .HandleClick(_ => isEditOpen.Set(true)))
-                .Add(new Button("Delete Category")
-                    .Variant(ButtonVariant.Destructive)
-                    .Icon(Icons.Trash)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            var categoryToDelete = context.Categories.FirstOrDefault(c => c.Id == categoryId);
-                            if (categoryToDelete != null)
-                            {
-                                context.Categories.Remove(categoryToDelete);
-                                context.SaveChanges();
-                                client.Toast($"Category {categoryData.Value.Name} deleted successfully!");
-                                refreshToken.Refresh();
-                                onRefresh?.Invoke();
-                                blades.Pop();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error deleting category: {ex.Message}", "Error");
-                        }
-                    }))
-                .Add(new Button("Cancel", _ => blades.Pop())
-                    .Variant(ButtonVariant.Secondary)))
-            .Add(Text.H3("Articles in this Category"))
-            .Add(categoryData.Value.Articles.Any() 
-                ? new List(articleItems)
-                : Text.Block("No articles in this category yet."))
-            .Add(isEditOpen.Value ? new Sheet(
-                (Event<Sheet> _) => isEditOpen.Set(false),
-                new CategoryFormSheet(categoryId, () => {
-                    isEditOpen.Set(false);
-                    refreshToken.Refresh();
-                    onRefresh?.Invoke();
-                }),
-                title: "Edit Category",
-                description: $"Edit category {categoryData.Value.Name}"
-            ).Width(Size.Fraction(1/3f)) : null);
     }
 }
