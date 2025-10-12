@@ -2,20 +2,20 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IvyOneBusinessOnePlatform.Data;
 
-public static class WorkOrderStatus
+public enum WorkOrderStatus
 {
-    public const string Scheduled = "Scheduled";
-    public const string InProduction = "In Production";
-    public const string Completed = "Completed";
-    public const string Cancelled = "Cancelled";
+    Scheduled,
+    InProduction,
+    Completed,
+    Cancelled
 }
 
-public static class WorkOrderPriority
+public enum WorkOrderPriority
 {
-    public const string Low = "Low";
-    public const string Normal = "Normal";
-    public const string High = "High";
-    public const string Urgent = "Urgent";
+    Low,
+    Normal,
+    High,
+    Urgent
 }
 
 public class WorkOrder
@@ -35,8 +35,7 @@ public class WorkOrder
     public int Quantity { get; set; }
     
     [Required]
-    [MaxLength(50)]
-    public string Status { get; set; } = WorkOrderStatus.Scheduled;
+    public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Scheduled;
     
     [Range(0, 100, ErrorMessage = "Progress must be between 0 and 100")]
     public int Progress { get; set; } = 0;
@@ -52,8 +51,7 @@ public class WorkOrder
     public DateTime PlannedEndDate { get; set; }
     
     [Required]
-    [MaxLength(50)]
-    public string Priority { get; set; } = WorkOrderPriority.Normal;
+    public WorkOrderPriority Priority { get; set; } = WorkOrderPriority.Normal;
     
     [MaxLength(2000)]
     public string? Notes { get; set; }
