@@ -23,7 +23,7 @@ public class KnowledgeRootBlade : ViewBase
         var isNewArticleOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
-        var query = context.Articles.Include(a => a.Category).AsQueryable();
+        var query = context.Articles.Include(a => a.Category).Where(a => a.Status == "Published").AsQueryable();
 
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
@@ -101,13 +101,11 @@ public class ArticleDetailBlade(int articleId, Action? onRefresh = null) : ViewB
             var updatedArticle = context.Articles.Include(a => a.Category).FirstOrDefault(a => a.Id == articleId);
             if (updatedArticle != null)
             {
-                // Increment view count
-                var dbArticle = context.Articles.FirstOrDefault(a => a.Id == articleId);
-                if (dbArticle != null && dbArticle.ViewCount == updatedArticle.ViewCount)
+                // Increment view count if not already incremented
+                if (updatedArticle.ViewCount == articleData.Value?.ViewCount)
                 {
-                    dbArticle.ViewCount++;
+                    updatedArticle.ViewCount++;
                     context.SaveChanges();
-                    updatedArticle.ViewCount = dbArticle.ViewCount;
                 }
                 articleData.Set(updatedArticle);
             }
