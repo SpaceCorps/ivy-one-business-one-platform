@@ -184,6 +184,23 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
 
 public class ProductFormSheet(int? productId = null, Action? onClose = null) : ViewBase
 {
+    private Product CloneProduct(Product source) => new Product
+    {
+        Id = source.Id,
+        ProductCode = source.ProductCode,
+        Name = source.Name,
+        Description = source.Description,
+        Price = source.Price,
+        Cost = source.Cost,
+        QuantityInStock = source.QuantityInStock,
+        MinimumStockLevel = source.MinimumStockLevel,
+        Category = source.Category,
+        Supplier = source.Supplier,
+        IsActive = source.IsActive,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -290,33 +307,33 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                         .Add(Text.Small("Product Information"))
                         .Add(Text.Small("Product Code"))
                         .Add(new TextInput(productForm.Value.ProductCode, e => {
-                            var updated = productForm.Value;
-                            updated.ProductCode = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.ProductCode = e.Value;
+                            productForm.Set(cloned);
                         }).Placeholder("PROD-001").Disabled(isEdit))
                         .Add(Text.Small("Product Name"))
                         .Add(new TextInput(productForm.Value.Name, e => {
-                            var updated = productForm.Value;
-                            updated.Name = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Name = e.Value;
+                            productForm.Set(cloned);
                         }).Placeholder("Product Name"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(productForm.Value.Description, e => {
-                            var updated = productForm.Value;
-                            updated.Description = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Description = e.Value;
+                            productForm.Set(cloned);
                         }).Placeholder("Product description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Category"))
                         .Add(new TextInput(productForm.Value.Category, e => {
-                            var updated = productForm.Value;
-                            updated.Category = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Category = e.Value;
+                            productForm.Set(cloned);
                         }).Placeholder("Electronics"))
                         .Add(Text.Small("Supplier"))
                         .Add(new TextInput(productForm.Value.Supplier, e => {
-                            var updated = productForm.Value;
-                            updated.Supplier = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Supplier = e.Value;
+                            productForm.Set(cloned);
                         }).Placeholder("Supplier Name"))
                 ).Title("Product Details"))
                 
@@ -325,15 +342,15 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                         .Add(Text.Small("Pricing Information"))
                         .Add(Text.Small("Sale Price ($)"))
                         .Add(new NumberInput<decimal>(productForm.Value.Price, v => {
-                            var updated = productForm.Value;
-                            updated.Price = v;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Price = v;
+                            productForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Cost ($)"))
                         .Add(new NumberInput<decimal>(productForm.Value.Cost, v => {
-                            var updated = productForm.Value;
-                            updated.Cost = v;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.Cost = v;
+                            productForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Margin"))
                         .Add(Text.H3(productForm.Value.Price > 0 
@@ -346,21 +363,21 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                         .Add(Text.Small("Inventory"))
                         .Add(Text.Small("Quantity in Stock"))
                         .Add(new NumberInput<int>(productForm.Value.QuantityInStock, v => {
-                            var updated = productForm.Value;
-                            updated.QuantityInStock = v;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.QuantityInStock = v;
+                            productForm.Set(cloned);
                         }).Placeholder("0"))
                         .Add(Text.Small("Minimum Stock Level"))
                         .Add(new NumberInput<int>(productForm.Value.MinimumStockLevel, v => {
-                            var updated = productForm.Value;
-                            updated.MinimumStockLevel = v;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.MinimumStockLevel = v;
+                            productForm.Set(cloned);
                         }).Placeholder("10"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<bool>(productForm.Value.IsActive, e => {
-                            var updated = productForm.Value;
-                            updated.IsActive = e.Value;
-                            productForm.Set(updated);
+                            var cloned = CloneProduct(productForm.Value);
+                            cloned.IsActive = e.Value;
+                            productForm.Set(cloned);
                         }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
                 ).Title("Stock"))
         );
@@ -369,6 +386,18 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
 
 public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewBase
 {
+    private StockMovement CloneStockMovement(StockMovement source) => new StockMovement
+    {
+        Id = source.Id,
+        ProductId = source.ProductId,
+        MovementType = source.MovementType,
+        Quantity = source.Quantity,
+        Reference = source.Reference,
+        Notes = source.Notes,
+        MovementDate = source.MovementDate,
+        CreatedAt = source.CreatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -471,33 +500,33 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                         .Add(Text.Small("Stock Adjustment"))
                         .Add(Text.Small("Movement Type"))
                         .Add(new SelectInput<string>(adjustmentForm.Value.MovementType, e => {
-                            var updated = adjustmentForm.Value;
-                            updated.MovementType = e.Value;
-                            adjustmentForm.Set(updated);
+                            var cloned = CloneStockMovement(adjustmentForm.Value);
+                            cloned.MovementType = e.Value;
+                            adjustmentForm.Set(cloned);
                         }, movementTypeOptions.ToOptions()))
                         .Add(Text.Small("Quantity"))
                         .Add(new NumberInput<int>(adjustmentForm.Value.Quantity, v => {
-                            var updated = adjustmentForm.Value;
-                            updated.Quantity = v;
-                            adjustmentForm.Set(updated);
+                            var cloned = CloneStockMovement(adjustmentForm.Value);
+                            cloned.Quantity = v;
+                            adjustmentForm.Set(cloned);
                         }).Placeholder("1"))
                         .Add(Text.Small("Reference"))
                         .Add(new TextInput(adjustmentForm.Value.Reference, e => {
-                            var updated = adjustmentForm.Value;
-                            updated.Reference = e.Value;
-                            adjustmentForm.Set(updated);
+                            var cloned = CloneStockMovement(adjustmentForm.Value);
+                            cloned.Reference = e.Value;
+                            adjustmentForm.Set(cloned);
                         }).Placeholder("PO-12345"))
                         .Add(Text.Small("Movement Date"))
                         .Add(new DateTimeInput<DateTime>(adjustmentForm.Value.MovementDate, e => {
-                            var updated = adjustmentForm.Value;
-                            updated.MovementDate = e.Value;
-                            adjustmentForm.Set(updated);
+                            var cloned = CloneStockMovement(adjustmentForm.Value);
+                            cloned.MovementDate = e.Value;
+                            adjustmentForm.Set(cloned);
                         }))
                         .Add(Text.Small("Notes"))
                         .Add(new TextInput(adjustmentForm.Value.Notes, e => {
-                            var updated = adjustmentForm.Value;
-                            updated.Notes = e.Value;
-                            adjustmentForm.Set(updated);
+                            var cloned = CloneStockMovement(adjustmentForm.Value);
+                            cloned.Notes = e.Value;
+                            adjustmentForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("New Stock Level"))
                         .Add(Text.H3(adjustmentForm.Value.MovementType == "Out" 
