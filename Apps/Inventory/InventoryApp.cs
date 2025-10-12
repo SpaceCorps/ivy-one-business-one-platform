@@ -3,6 +3,14 @@ using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.Inventory;
 
+public static class MovementType
+{
+    public const string In = "In";
+    public const string Out = "Out";
+    public const string Transfer = "Transfer";
+    public const string Adjustment = "Adjustment";
+}
+
 [App(icon: Icons.Box, title: "Inventory", path: new[] { "Business Operations" })]
 public class InventoryApp : ViewBase
 {
@@ -42,7 +50,7 @@ public class InventoryRootBlade : ViewBase
             subtitle: $"Stock: {prod.QuantityInStock} - ${prod.Price:N2} - {prod.Category}",
             icon: Icons.Package,
             badge: prod.QuantityInStock < prod.MinimumStockLevel ? "Low Stock" : $"{prod.QuantityInStock}",
-            onClick: _ => blades.Push(this, new ProductDetailBlade(prod.Id, () => refreshToken.Refresh()), prod.Name)
+            onClick: _ => { blades.Push(this, new ProductDetailBlade(prod.Id, () => refreshToken.Refresh()), prod.Name); return default; }
         ));
         
         var mainContent = BladeHelper.WithHeader(
@@ -415,14 +423,14 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
         var adjustmentForm = this.UseState(new StockMovement
         {
             ProductId = productId,
-            MovementType = "In",
+            MovementType = MovementType.In,
             Quantity = 1,
             Reference = "",
             Notes = "",
             MovementDate = DateTime.UtcNow
         });
         
-        var movementTypeOptions = new[] { "In", "Out", "Transfer", "Adjustment" };
+        var movementTypeOptions = new[] { MovementType.In, MovementType.Out, MovementType.Transfer, MovementType.Adjustment };
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
@@ -441,11 +449,11 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             if (dbProduct != null)
                             {
                                 // Adjust stock based on movement type
-                                if (adjustmentForm.Value.MovementType == "In" || adjustmentForm.Value.MovementType == "Adjustment")
+                                if (adjustmentForm.Value.MovementType == MovementType.In || adjustmentForm.Value.MovementType == MovementType.Adjustment)
                                 {
                                     dbProduct.QuantityInStock += adjustmentForm.Value.Quantity;
                                 }
-                                else if (adjustmentForm.Value.MovementType == "Out")
+                                else if (adjustmentForm.Value.MovementType == MovementType.Out)
                                 {
                                     if (dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
                                     {
@@ -529,7 +537,7 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             adjustmentForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("New Stock Level"))
-                        .Add(Text.H3(adjustmentForm.Value.MovementType == "Out" 
+                        .Add(Text.H3(adjustmentForm.Value.MovementType == MovementType.Out 
                             ? $"{product.QuantityInStock - adjustmentForm.Value.Quantity}" 
                             : $"{product.QuantityInStock + adjustmentForm.Value.Quantity}"))
                 ).Title("Adjustment Details"))
