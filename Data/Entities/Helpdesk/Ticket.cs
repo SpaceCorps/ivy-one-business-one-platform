@@ -1,6 +1,23 @@
+
 using System.ComponentModel.DataAnnotations;
 
 namespace IvyOneBusinessOnePlatform.Data;
+
+public enum TicketStatus
+{
+    Open,
+    InProgress,
+    Resolved,
+    Closed
+}
+
+public enum TicketPriority
+{
+    Low,
+    Medium,
+    High,
+    Critical
+}
 
 public class Ticket
 {
@@ -27,13 +44,9 @@ public class Ticket
     [MaxLength(5000)]
     public string Description { get; set; } = string.Empty;
     
-    [Required]
-    [MaxLength(50)]
-    public string Status { get; set; } = "Open"; // Open, In Progress, Resolved, Closed
+    public TicketStatus Status { get; set; } = TicketStatus.Open;
     
-    [Required]
-    [MaxLength(50)]
-    public string Priority { get; set; } = "Medium"; // Low, Medium, High, Critical
+    public TicketPriority Priority { get; set; } = TicketPriority.Medium;
     
     [MaxLength(200)]
     public string AssignedTo { get; set; } = string.Empty;
