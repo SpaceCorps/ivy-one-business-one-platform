@@ -32,8 +32,8 @@ public class HelpdeskRootBlade : ViewBase
                 EF.Functions.Like(t.TicketNumber, searchPattern) ||
                 EF.Functions.Like(t.CustomerName, searchPattern) ||
                 EF.Functions.Like(t.Subject, searchPattern) ||
-                EF.Functions.Like(t.Status, searchPattern) ||
-                EF.Functions.Like(t.Priority, searchPattern));
+                t.Status.ToString().Contains(searchQuery.Value, StringComparison.OrdinalIgnoreCase) ||
+                t.Priority.ToString().Contains(searchQuery.Value, StringComparison.OrdinalIgnoreCase));
         }
         
         var tickets = query.OrderByDescending(t => t.CreatedAt).ToList();
@@ -42,7 +42,7 @@ public class HelpdeskRootBlade : ViewBase
             title: $"{ticket.TicketNumber} - {ticket.Subject}",
             subtitle: $"{ticket.CustomerName} - {ticket.Priority} priority",
             icon: Icons.Info,
-            badge: ticket.Status,
+            badge: ticket.Status.ToString(),
             onClick: _ => blades.Push(this, new TicketDetailBlade(ticket.Id, () => refreshToken.Refresh()), ticket.TicketNumber)
         ));
         
@@ -103,14 +103,14 @@ public class TicketDetailBlade(int ticketId, Action? onRefresh = null) : ViewBas
             }
         }, [refreshToken.ToTrigger()]);
         
-        var statusBadge = new Badge(ticketData.Value.Status)
-            .Variant(ticketData.Value.Status == "Resolved" || ticketData.Value.Status == "Closed" ? BadgeVariant.Success :
-                   ticketData.Value.Status == "In Progress" ? BadgeVariant.Primary :
+        var statusBadge = new Badge(ticketData.Value.Status.ToString())
+            .Variant(ticketData.Value.Status == TicketStatus.Resolved || ticketData.Value.Status == TicketStatus.Closed ? BadgeVariant.Success :
+                   ticketData.Value.Status == TicketStatus.InProgress ? BadgeVariant.Primary :
                    BadgeVariant.Secondary);
         
-        var priorityBadge = new Badge(ticketData.Value.Priority)
-            .Variant(ticketData.Value.Priority == "Critical" || ticketData.Value.Priority == "High" ? BadgeVariant.Destructive :
-                   ticketData.Value.Priority == "Medium" ? BadgeVariant.Warning :
+        var priorityBadge = new Badge(ticketData.Value.Priority.ToString())
+            .Variant(ticketData.Value.Priority == TicketPriority.Critical || ticketData.Value.Priority == TicketPriority.High ? BadgeVariant.Destructive :
+                   ticketData.Value.Priority == TicketPriority.Medium ? BadgeVariant.Warning :
                    BadgeVariant.Outline);
 
         var ticketDetails = new
@@ -134,11 +134,11 @@ public class TicketDetailBlade(int ticketId, Action? onRefresh = null) : ViewBas
             .Add(ticketDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(ticketData.Value.Status != "Resolved" && ticketData.Value.Status != "Closed" ? new Button("Resolve Ticket", _ => {
+                .Add(ticketData.Value.Status != TicketStatus.Resolved && ticketData.Value.Status != TicketStatus.Closed ? new Button("Resolve Ticket", _ => {
                     var dbTicket = context.Tickets.FirstOrDefault(t => t.Id == ticketId);
                     if (dbTicket != null)
                     {
-                        dbTicket.Status = "Resolved";
+                        dbTicket.Status = TicketStatus.Resolved;
                         dbTicket.ResolvedAt = DateTime.UtcNow;
                         dbTicket.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
@@ -150,11 +150,11 @@ public class TicketDetailBlade(int ticketId, Action? onRefresh = null) : ViewBas
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Check)
                     : null)
-                .Add(ticketData.Value.Status == "Resolved" ? new Button("Close Ticket", _ => {
+                .Add(ticketData.Value.Status == TicketStatus.Resolved ? new Button("Close Ticket", _ => {
                     var dbTicket = context.Tickets.FirstOrDefault(t => t.Id == ticketId);
                     if (dbTicket != null)
                     {
-                        dbTicket.Status = "Closed";
+                        dbTicket.Status = TicketStatus.Closed;
                         dbTicket.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Ticket {ticketData.Value.TicketNumber} closed!");
@@ -225,6 +225,23 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
         ResolvedAt = source.ResolvedAt
     };
     
+    private string? ValidateTicket(Ticket ticket, IClientProvider client)
+    {
+        if (string.IsNullOrWhiteSpace(ticket.TicketNumber))
+            return "Ticket Number is required";
+        
+        if (string.IsNullOrWhiteSpace(ticket.CustomerName))
+            return "Customer Name is required";
+        
+        if (string.IsNullOrWhiteSpace(ticket.Subject))
+            return "Subject is required";
+        
+        if (string.IsNullOrWhiteSpace(ticket.Description))
+            return "Description is required";
+        
+        return null;
+    }
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -240,14 +257,14 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
             CustomerEmail = "",
             Subject = "",
             Description = "",
-            Status = "Open",
-            Priority = "Medium",
+            Status = TicketStatus.Open,
+            Priority = TicketPriority.Medium,
             Category = "",
             AssignedTo = ""
         });
         
-        var statusOptions = new[] { "Open", "In Progress", "Resolved", "Closed" };
-        var priorityOptions = new[] { "Low", "Medium", "High", "Critical" };
+        var statusOptions = typeof(TicketStatus).ToOptions();
+        var priorityOptions = typeof(TicketPriority).ToOptions();
         var categoryOptions = new[] { "Technical", "Feature", "Bug", "Account", "General", "Other" };
         
         return new FooterLayout(
@@ -257,27 +274,10 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     .HandleClick(_ => {
                         try
                         {
-                            if (string.IsNullOrWhiteSpace(ticketForm.Value.TicketNumber))
+                            var validationError = ValidateTicket(ticketForm.Value, client);
+                            if (validationError != null)
                             {
-                                client.Toast("Ticket Number is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(ticketForm.Value.CustomerName))
-                            {
-                                client.Toast("Customer Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(ticketForm.Value.Subject))
-                            {
-                                client.Toast("Subject is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(ticketForm.Value.Description))
-                            {
-                                client.Toast("Description is required", "Validation Error");
+                                client.Toast(validationError, "Validation Error");
                                 return;
                             }
                             
@@ -331,27 +331,25 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Ticket Information"))
                         .Add(Text.Small("Ticket Number"))
-                        .Add(new TextInput(ticketForm.Value.TicketNumber, e => {
-                            if (!isEdit) {
-                                var cloned = CloneTicket(ticketForm.Value);
-                                cloned.TicketNumber = e.Value;
-                                ticketForm.Set(cloned);
-                            }
-                        }).Placeholder("HD-001").Disabled(isEdit))
+                        .Add(new TextInput(ticketForm.Value.TicketNumber, isEdit ? null : (e => {
+                            var cloned = CloneTicket(ticketForm.Value);
+                            cloned.TicketNumber = e.Value;
+                            ticketForm.Set(cloned);
+                        })).Placeholder("HD-001").Disabled(isEdit))
                         .Add(Text.Small("Subject"))
-                        .Add(new TextInput(ticketForm.Value.Subject, e => {
+                        .Add(new TextInput(ticketForm.Value.Subject, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Subject = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("Issue subject"))
                         .Add(Text.Small("Description"))
-                        .Add(new TextInput(ticketForm.Value.Description, e => {
+                        .Add(new TextInput(ticketForm.Value.Description, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Description = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Category"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => {
+                        .Add(new SelectInput<string>(ticketForm.Value.Category, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Category = e.Value;
                             ticketForm.Set(cloned);
@@ -362,13 +360,13 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
-                        .Add(new TextInput(ticketForm.Value.CustomerName, e => {
+                        .Add(new TextInput(ticketForm.Value.CustomerName, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.CustomerName = e.Value;
                             ticketForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Customer Email"))
-                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => {
+                        .Add(new TextInput(ticketForm.Value.CustomerEmail, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.CustomerEmail = e.Value;
                             ticketForm.Set(cloned);
@@ -379,19 +377,19 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Ticket Management"))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Status, e => {
+                        .Add(new SelectInput<TicketStatus>(ticketForm.Value.Status, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Status = e.Value;
                             ticketForm.Set(cloned);
-                        }, statusOptions.ToOptions()))
+                        }, statusOptions))
                         .Add(Text.Small("Priority"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Priority, e => {
+                        .Add(new SelectInput<TicketPriority>(ticketForm.Value.Priority, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.Priority = e.Value;
                             ticketForm.Set(cloned);
-                        }, priorityOptions.ToOptions()))
+                        }, priorityOptions))
                         .Add(Text.Small("Assigned To"))
-                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => {
+                        .Add(new TextInput(ticketForm.Value.AssignedTo, async e => {
                             var cloned = CloneTicket(ticketForm.Value);
                             cloned.AssignedTo = e.Value;
                             ticketForm.Set(cloned);
