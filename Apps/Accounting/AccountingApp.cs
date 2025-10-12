@@ -569,6 +569,23 @@ public class TransactionDetailBlade(int transactionId, Action? onRefresh = null)
 
 public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : ViewBase
 {
+    private Invoice CloneInvoice(Invoice source) => new Invoice
+    {
+        Id = source.Id,
+        InvoiceNumber = source.InvoiceNumber,
+        CustomerName = source.CustomerName,
+        CustomerEmail = source.CustomerEmail,
+        Amount = source.Amount,
+        TaxAmount = source.TaxAmount,
+        TotalAmount = source.TotalAmount,
+        Status = source.Status,
+        IssueDate = source.IssueDate,
+        DueDate = source.DueDate,
+        Description = source.Description,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -698,27 +715,29 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                         .Add(Text.Small("Invoice Information"))
                         .Add(Text.Small("Invoice Number"))
                         .Add(new TextInput(invoiceForm.Value.InvoiceNumber, e => {
-                            var updated = invoiceForm.Value;
-                            updated.InvoiceNumber = e.Value;
-                            invoiceForm.Set(updated);
+                            if (!isEdit) {
+                                var cloned = CloneInvoice(invoiceForm.Value);
+                                cloned.InvoiceNumber = e.Value;
+                                invoiceForm.Set(cloned);
+                            }
                         }).Placeholder("INV-001").Disabled(isEdit))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(invoiceForm.Value.Status, e => {
-                            var updated = invoiceForm.Value;
-                            updated.Status = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.Status = e.Value;
+                            invoiceForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                         .Add(Text.Small("Issue Date"))
                         .Add(new DateTimeInput<DateTime>(invoiceForm.Value.IssueDate, e => {
-                            var updated = invoiceForm.Value;
-                            updated.IssueDate = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.IssueDate = e.Value;
+                            invoiceForm.Set(cloned);
                         }))
                         .Add(Text.Small("Due Date"))
                         .Add(new DateTimeInput<DateTime>(invoiceForm.Value.DueDate, e => {
-                            var updated = invoiceForm.Value;
-                            updated.DueDate = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.DueDate = e.Value;
+                            invoiceForm.Set(cloned);
                         }))
                 ).Title("Invoice Details"))
                 
@@ -727,15 +746,15 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
                         .Add(new TextInput(invoiceForm.Value.CustomerName, e => {
-                            var updated = invoiceForm.Value;
-                            updated.CustomerName = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.CustomerName = e.Value;
+                            invoiceForm.Set(cloned);
                         }).Placeholder("Customer Name"))
                         .Add(Text.Small("Customer Email"))
                         .Add(new TextInput(invoiceForm.Value.CustomerEmail, e => {
-                            var updated = invoiceForm.Value;
-                            updated.CustomerEmail = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.CustomerEmail = e.Value;
+                            invoiceForm.Set(cloned);
                         }).Placeholder("customer@example.com"))
                 ).Title("Customer"))
                 
@@ -744,17 +763,17 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                         .Add(Text.Small("Amount Information"))
                         .Add(Text.Small("Amount ($)"))
                         .Add(new NumberInput<decimal>(invoiceForm.Value.Amount, v => {
-                            var updated = invoiceForm.Value;
-                            updated.Amount = v;
-                            updated.TotalAmount = v + updated.TaxAmount;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.Amount = v;
+                            cloned.TotalAmount = v + cloned.TaxAmount;
+                            invoiceForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Tax Amount ($)"))
                         .Add(new NumberInput<decimal>(invoiceForm.Value.TaxAmount, v => {
-                            var updated = invoiceForm.Value;
-                            updated.TaxAmount = v;
-                            updated.TotalAmount = updated.Amount + v;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.TaxAmount = v;
+                            cloned.TotalAmount = cloned.Amount + v;
+                            invoiceForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Total Amount ($)"))
                         .Add(Text.H3($"${(invoiceForm.Value.Amount + invoiceForm.Value.TaxAmount):N2}"))
@@ -765,9 +784,9 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(invoiceForm.Value.Description, e => {
-                            var updated = invoiceForm.Value;
-                            updated.Description = e.Value;
-                            invoiceForm.Set(updated);
+                            var cloned = CloneInvoice(invoiceForm.Value);
+                            cloned.Description = e.Value;
+                            invoiceForm.Set(cloned);
                         }).Placeholder("Invoice description...").Variant(TextInputs.Textarea))
                 ).Title("Description"))
         );
@@ -776,6 +795,19 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
 
 public class AccountFormSheet(int? accountId = null, Action? onClose = null) : ViewBase
 {
+    private Account CloneAccount(Account source) => new Account
+    {
+        Id = source.Id,
+        AccountNumber = source.AccountNumber,
+        AccountName = source.AccountName,
+        AccountType = source.AccountType,
+        Balance = source.Balance,
+        IsActive = source.IsActive,
+        Description = source.Description,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -887,33 +919,33 @@ public class AccountFormSheet(int? accountId = null, Action? onClose = null) : V
                         .Add(Text.Small("Account Information"))
                         .Add(Text.Small("Account Number"))
                         .Add(new TextInput(accountForm.Value.AccountNumber, e => {
-                            var updated = accountForm.Value;
-                            updated.AccountNumber = e.Value;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.AccountNumber = e.Value;
+                            accountForm.Set(cloned);
                         }).Placeholder("1000"))
                         .Add(Text.Small("Account Name"))
                         .Add(new TextInput(accountForm.Value.AccountName, e => {
-                            var updated = accountForm.Value;
-                            updated.AccountName = e.Value;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.AccountName = e.Value;
+                            accountForm.Set(cloned);
                         }).Placeholder("Cash"))
                         .Add(Text.Small("Account Type"))
                         .Add(new SelectInput<string>(accountForm.Value.AccountType, e => {
-                            var updated = accountForm.Value;
-                            updated.AccountType = e.Value;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.AccountType = e.Value;
+                            accountForm.Set(cloned);
                         }, accountTypeOptions.ToOptions()))
                         .Add(Text.Small("Balance ($)"))
                         .Add(new NumberInput<decimal>(accountForm.Value.Balance, v => {
-                            var updated = accountForm.Value;
-                            updated.Balance = v;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.Balance = v;
+                            accountForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<bool>(accountForm.Value.IsActive, e => {
-                            var updated = accountForm.Value;
-                            updated.IsActive = e.Value;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.IsActive = e.Value;
+                            accountForm.Set(cloned);
                         }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
                 ).Title("Account Details"))
                 
@@ -922,9 +954,9 @@ public class AccountFormSheet(int? accountId = null, Action? onClose = null) : V
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(accountForm.Value.Description, e => {
-                            var updated = accountForm.Value;
-                            updated.Description = e.Value;
-                            accountForm.Set(updated);
+                            var cloned = CloneAccount(accountForm.Value);
+                            cloned.Description = e.Value;
+                            accountForm.Set(cloned);
                         }).Placeholder("Account description...").Variant(TextInputs.Textarea))
                 ).Title("Description"))
         );
@@ -933,6 +965,19 @@ public class AccountFormSheet(int? accountId = null, Action? onClose = null) : V
 
 public class TransactionFormSheet(int? transactionId = null, Action? onClose = null) : ViewBase
 {
+    private Transaction CloneTransaction(Transaction source) => new Transaction
+    {
+        Id = source.Id,
+        TransactionNumber = source.TransactionNumber,
+        TransactionDate = source.TransactionDate,
+        Description = source.Description,
+        DebitAmount = source.DebitAmount,
+        CreditAmount = source.CreditAmount,
+        Reference = source.Reference,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -1054,27 +1099,27 @@ public class TransactionFormSheet(int? transactionId = null, Action? onClose = n
                         .Add(Text.Small("Transaction Information"))
                         .Add(Text.Small("Transaction Number"))
                         .Add(new TextInput(transactionForm.Value.TransactionNumber, e => {
-                            var updated = transactionForm.Value;
-                            updated.TransactionNumber = e.Value;
-                            transactionForm.Set(updated);
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.TransactionNumber = e.Value;
+                            transactionForm.Set(cloned);
                         }).Placeholder("TXN-001").Disabled(isEdit))
                         .Add(Text.Small("Transaction Date"))
                         .Add(new DateTimeInput<DateTime>(transactionForm.Value.TransactionDate, e => {
-                            var updated = transactionForm.Value;
-                            updated.TransactionDate = e.Value;
-                            transactionForm.Set(updated);
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.TransactionDate = e.Value;
+                            transactionForm.Set(cloned);
                         }))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(transactionForm.Value.Description, e => {
-                            var updated = transactionForm.Value;
-                            updated.Description = e.Value;
-                            transactionForm.Set(updated);
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.Description = e.Value;
+                            transactionForm.Set(cloned);
                         }).Placeholder("Transaction description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Reference"))
                         .Add(new TextInput(transactionForm.Value.Reference, e => {
-                            var updated = transactionForm.Value;
-                            updated.Reference = e.Value;
-                            transactionForm.Set(updated);
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.Reference = e.Value;
+                            transactionForm.Set(cloned);
                         }).Placeholder("Reference number or code"))
                 ).Title("Transaction Details"))
                 
@@ -1083,23 +1128,23 @@ public class TransactionFormSheet(int? transactionId = null, Action? onClose = n
                         .Add(Text.Small("Amount Information"))
                         .Add(Text.Small("Debit Amount ($)"))
                         .Add(new NumberInput<decimal>(transactionForm.Value.DebitAmount, v => {
-                            var updated = transactionForm.Value;
-                            updated.DebitAmount = v;
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.DebitAmount = v;
                             if (v > 0)
                             {
-                                updated.CreditAmount = 0;
+                                cloned.CreditAmount = 0;
                             }
-                            transactionForm.Set(updated);
+                            transactionForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Credit Amount ($)"))
                         .Add(new NumberInput<decimal>(transactionForm.Value.CreditAmount, v => {
-                            var updated = transactionForm.Value;
-                            updated.CreditAmount = v;
+                            var cloned = CloneTransaction(transactionForm.Value);
+                            cloned.CreditAmount = v;
                             if (v > 0)
                             {
-                                updated.DebitAmount = 0;
+                                cloned.DebitAmount = 0;
                             }
-                            transactionForm.Set(updated);
+                            transactionForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Transaction Type"))
                         .Add(Text.Block(transactionForm.Value.DebitAmount > 0 ? "Debit Transaction" : 
