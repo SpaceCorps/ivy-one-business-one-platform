@@ -262,63 +262,161 @@ public class AccountsBlade : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var searchQuery = this.UseState("");
+        var isNewAccountOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
         
-        var accounts = context.Accounts.OrderBy(a => a.AccountNumber).ToList();
+        var query = context.Accounts.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(searchQuery.Value))
+        {
+            var searchPattern = $"%{searchQuery.Value}%";
+            query = query.Where(a => 
+                EF.Functions.Like(a.AccountNumber, searchPattern) ||
+                EF.Functions.Like(a.AccountName, searchPattern) ||
+                EF.Functions.Like(a.AccountType, searchPattern) ||
+                EF.Functions.Like(a.Description, searchPattern));
+        }
+        
+        var accounts = query.OrderBy(a => a.AccountNumber).ToList();
         
         var listItems = accounts.Select(account => new ListItem(
             title: $"{account.AccountNumber} - {account.AccountName}",
             subtitle: $"{account.AccountType} - Balance: ${account.Balance:N2}",
             icon: Icons.Book,
             badge: account.IsActive ? "Active" : "Inactive",
-            onClick: _ => blades.Push(this, new AccountDetailBlade(account.Id), account.AccountName)
+            onClick: _ => blades.Push(this, new AccountDetailBlade(account.Id, () => refreshToken.Refresh()), account.AccountName)
         ));
         
-        return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
-            .Add(Layout.Horizontal()
-                .Gap(12)
-                .Add(Text.H3("Chart of Accounts"))
-                .Add(new Button("Add Account", _ => client.Toast("Add account"))
+        var mainContent = BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(4)
+                .Add(searchQuery.ToSearchInput().Placeholder("Search by account number, name, type, or description..."))
+                .Add(new Button("Add Account")
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)))
-            .Add(accounts.Count == 0 
-                ? Text.Block("No accounts found. Add your first account!")
-                : new List(listItems));
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => isNewAccountOpen.Set(true))),
+            accounts.Count == 0 
+                ? Text.Block("No accounts found. Try a different search or add your first account!")
+                : new List(listItems)
+        );
+
+        return isNewAccountOpen.Value ? new Sheet(
+            (Event<Sheet> _) => isNewAccountOpen.Set(false),
+            new AccountFormSheet(null, () => {
+                isNewAccountOpen.Set(false);
+                refreshToken.Refresh();
+            }),
+            title: "New Account",
+            description: "Add a new account to the chart of accounts"
+        ).Width(Size.Fraction(1/3f)) : mainContent;
     }
 }
 
-public class AccountDetailBlade(int accountId) : ViewBase
+public class AccountDetailBlade(int accountId, Action? onRefresh = null) : ViewBase
 {
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
         
-        var account = context.Accounts.FirstOrDefault(a => a.Id == accountId);
+        var initialAccount = context.Accounts.FirstOrDefault(a => a.Id == accountId);
         
-        if (account == null)
-            return "Account not found";
+        if (initialAccount == null)
+        {
+            return Layout.Vertical()
+                .Gap(4)
+                .Add(Text.H3("Account Not Found"))
+                .Add(new Button("Go Back", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary));
+        }
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add($"{account.AccountNumber} - {account.AccountName}")
-                .Add(Layout.Vertical()
-                    .Gap(8)
-                    .Add($"Type: {account.AccountType}")
-                    .Add($"Balance: ${account.Balance:N2}")
-                    .Add($"Description: {account.Description}")
-                    .Add(new Badge(account.IsActive ? "Active" : "Inactive")
-                        .Variant(account.IsActive ? BadgeVariant.Success : BadgeVariant.Secondary)))
-                .Add(Layout.Horizontal()
-                    .Gap(12)
-                    .Add(new Button("Edit", _ => client.Toast("Edit account"))
-                        .Variant(ButtonVariant.Primary))
-                    .Add(new Button(account.IsActive ? "Deactivate" : "Activate", _ => client.Toast("Toggle status"))
-                        .Variant(account.IsActive ? ButtonVariant.Destructive : ButtonVariant.Success)))
-        );
+        var accountData = this.UseState(initialAccount);
+        var isEditOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
+        
+        // Refresh account data when refresh token changes
+        this.UseEffect(() =>
+        {
+            var updatedAccount = context.Accounts.FirstOrDefault(a => a.Id == accountId);
+            if (updatedAccount != null)
+            {
+                accountData.Set(updatedAccount);
+            }
+        }, [refreshToken.ToTrigger()]);
+        
+        var statusBadge = new Badge(accountData.Value.IsActive ? "Active" : "Inactive")
+            .Variant(accountData.Value.IsActive ? BadgeVariant.Success : BadgeVariant.Secondary);
+
+        var accountDetails = new
+        {
+            AccountNumber = accountData.Value.AccountNumber,
+            AccountName = accountData.Value.AccountName,
+            AccountType = accountData.Value.AccountType,
+            Balance = $"${accountData.Value.Balance:N2}",
+            Description = accountData.Value.Description,
+            Status = statusBadge
+        };
+        
+        return Layout.Vertical()
+            .Gap(4)
+            .Add(Text.H3($"{accountData.Value.AccountNumber} - {accountData.Value.AccountName}"))
+            .Add(accountDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(new Button(accountData.Value.IsActive ? "Deactivate" : "Activate", _ => {
+                    var dbAccount = context.Accounts.FirstOrDefault(a => a.Id == accountId);
+                    if (dbAccount != null)
+                    {
+                        dbAccount.IsActive = !dbAccount.IsActive;
+                        dbAccount.UpdatedAt = DateTime.UtcNow;
+                        context.SaveChanges();
+                        client.Toast($"Account {accountData.Value.AccountNumber} {(dbAccount.IsActive ? "activated" : "deactivated")}!");
+                        refreshToken.Refresh();
+                        onRefresh?.Invoke();
+                    }
+                })
+                    .Variant(accountData.Value.IsActive ? ButtonVariant.Destructive : ButtonVariant.Success)
+                    .Icon(accountData.Value.IsActive ? Icons.X : Icons.Check))
+                .Add(new Button("Edit Account")
+                    .Variant(ButtonVariant.Outline)
+                    .Icon(Icons.Pencil)
+                    .HandleClick(_ => isEditOpen.Set(true)))
+                .Add(new Button("Delete Account")
+                    .Variant(ButtonVariant.Destructive)
+                    .Icon(Icons.Trash)
+                    .HandleClick(_ => {
+                        try
+                        {
+                            var accountToDelete = context.Accounts.FirstOrDefault(a => a.Id == accountId);
+                            if (accountToDelete != null)
+                            {
+                                context.Accounts.Remove(accountToDelete);
+                                context.SaveChanges();
+                                client.Toast($"Account {accountData.Value.AccountNumber} deleted successfully!");
+                                refreshToken.Refresh();
+                                onRefresh?.Invoke();
+                                blades.Pop();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Toast($"Error deleting account: {ex.Message}", "Error");
+                        }
+                    }))
+                .Add(new Button("Cancel", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(isEditOpen.Value ? new Sheet(
+                (Event<Sheet> _) => isEditOpen.Set(false),
+                new AccountFormSheet(accountId, () => {
+                    isEditOpen.Set(false);
+                    refreshToken.Refresh();
+                    onRefresh?.Invoke();
+                }),
+                title: "Edit Account",
+                description: $"Edit account {accountData.Value.AccountNumber}"
+            ).Width(Size.Fraction(1/3f)) : null);
     }
 }
 
@@ -587,6 +685,163 @@ public class InvoiceFormSheet(int? invoiceId = null, Action? onClose = null) : V
                             updated.Description = e.Value;
                             invoiceForm.Set(updated);
                         }).Placeholder("Invoice description...").Variant(TextInputs.Textarea))
+                ).Title("Description"))
+        );
+    }
+}
+
+public class AccountFormSheet(int? accountId = null, Action? onClose = null) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var isEdit = accountId.HasValue;
+        var existingAccount = isEdit ? context.Accounts.FirstOrDefault(a => a.Id == accountId!.Value) : null;
+        
+        var accountForm = this.UseState(existingAccount ?? new Account
+        {
+            AccountNumber = "",
+            AccountName = "",
+            AccountType = "Asset",
+            Balance = 0.00m,
+            Description = "",
+            IsActive = true
+        });
+        
+        var accountTypeOptions = new[] { "Asset", "Liability", "Equity", "Revenue", "Expense" };
+        
+        return new FooterLayout(
+            Layout.Horizontal().Gap(2)
+                .Add(new Button("Save")
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => {
+                        try
+                        {
+                            // Client-side validation
+                            if (string.IsNullOrWhiteSpace(accountForm.Value.AccountNumber))
+                            {
+                                client.Toast("Account Number is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (string.IsNullOrWhiteSpace(accountForm.Value.AccountName))
+                            {
+                                client.Toast("Account Name is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (string.IsNullOrWhiteSpace(accountForm.Value.AccountType))
+                            {
+                                client.Toast("Account Type is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (accountForm.Value.Balance < 0)
+                            {
+                                client.Toast("Balance cannot be negative", "Validation Error");
+                                return;
+                            }
+                            
+                            if (accountForm.Value.AccountNumber.Length > 20)
+                            {
+                                client.Toast("Account Number cannot exceed 20 characters", "Validation Error");
+                                return;
+                            }
+                            
+                            if (accountForm.Value.AccountName.Length > 200)
+                            {
+                                client.Toast("Account Name cannot exceed 200 characters", "Validation Error");
+                                return;
+                            }
+                            
+                            if (isEdit && existingAccount != null)
+                            {
+                                // Update existing account
+                                existingAccount.AccountNumber = accountForm.Value.AccountNumber;
+                                existingAccount.AccountName = accountForm.Value.AccountName;
+                                existingAccount.AccountType = accountForm.Value.AccountType;
+                                existingAccount.Balance = accountForm.Value.Balance;
+                                existingAccount.Description = accountForm.Value.Description;
+                                existingAccount.IsActive = accountForm.Value.IsActive;
+                                existingAccount.UpdatedAt = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                // Create new account
+                                var newAccount = new Account
+                                {
+                                    AccountNumber = accountForm.Value.AccountNumber,
+                                    AccountName = accountForm.Value.AccountName,
+                                    AccountType = accountForm.Value.AccountType,
+                                    Balance = accountForm.Value.Balance,
+                                    Description = accountForm.Value.Description,
+                                    IsActive = accountForm.Value.IsActive,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                context.Accounts.Add(newAccount);
+                            }
+                            
+                            context.SaveChanges();
+                            client.Toast(isEdit ? "Account updated successfully!" : "Account created successfully!");
+                            onClose?.Invoke();
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Toast($"Error: {ex.Message}", "Error");
+                        }
+                    }))
+                .Add(new Button("Cancel")
+                    .Variant(ButtonVariant.Outline)
+                    .HandleClick(_ => onClose?.Invoke())),
+            
+            Layout.Vertical().Gap(4)
+                .Add(new Card(
+                    Layout.Vertical().Gap(3)
+                        .Add(Text.Small("Account Information"))
+                        .Add(Text.Small("Account Number"))
+                        .Add(new TextInput(accountForm.Value.AccountNumber, e => {
+                            var updated = accountForm.Value;
+                            updated.AccountNumber = e.Value;
+                            accountForm.Set(updated);
+                        }).Placeholder("1000"))
+                        .Add(Text.Small("Account Name"))
+                        .Add(new TextInput(accountForm.Value.AccountName, e => {
+                            var updated = accountForm.Value;
+                            updated.AccountName = e.Value;
+                            accountForm.Set(updated);
+                        }).Placeholder("Cash"))
+                        .Add(Text.Small("Account Type"))
+                        .Add(new SelectInput<string>(accountForm.Value.AccountType, e => {
+                            var updated = accountForm.Value;
+                            updated.AccountType = e.Value;
+                            accountForm.Set(updated);
+                        }, accountTypeOptions.ToOptions()))
+                        .Add(Text.Small("Balance ($)"))
+                        .Add(new NumberInput<decimal>(accountForm.Value.Balance, v => {
+                            var updated = accountForm.Value;
+                            updated.Balance = v;
+                            accountForm.Set(updated);
+                        }).Placeholder("0.00"))
+                        .Add(Text.Small("Status"))
+                        .Add(new SelectInput<bool>(accountForm.Value.IsActive, e => {
+                            var updated = accountForm.Value;
+                            updated.IsActive = e.Value;
+                            accountForm.Set(updated);
+                        }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
+                ).Title("Account Details"))
+                
+                .Add(new Card(
+                    Layout.Vertical().Gap(3)
+                        .Add(Text.Small("Additional Information"))
+                        .Add(Text.Small("Description"))
+                        .Add(new TextInput(accountForm.Value.Description, e => {
+                            var updated = accountForm.Value;
+                            updated.Description = e.Value;
+                            accountForm.Set(updated);
+                        }).Placeholder("Account description...").Variant(TextInputs.Textarea))
                 ).Title("Description"))
         );
     }
