@@ -427,59 +427,143 @@ public class TransactionsBlade : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
+        var searchQuery = this.UseState("");
+        var isNewTransactionOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
         
-        var transactions = context.Transactions.OrderByDescending(t => t.TransactionDate).ToList();
+        var query = context.Transactions.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(searchQuery.Value))
+        {
+            var searchPattern = $"%{searchQuery.Value}%";
+            query = query.Where(t => 
+                EF.Functions.Like(t.TransactionNumber, searchPattern) ||
+                EF.Functions.Like(t.Description, searchPattern) ||
+                EF.Functions.Like(t.Reference, searchPattern));
+        }
+        
+        var transactions = query.OrderByDescending(t => t.TransactionDate).ToList();
         
         var listItems = transactions.Select(transaction => new ListItem(
             title: $"#{transaction.TransactionNumber}",
             subtitle: $"{transaction.Description} - {transaction.TransactionDate:MMM dd, yyyy}",
             icon: Icons.ArrowLeftRight,
             badge: transaction.DebitAmount > 0 ? $"${transaction.DebitAmount:N2} DR" : $"${transaction.CreditAmount:N2} CR",
-            onClick: _ => blades.Push(this, new TransactionDetailBlade(transaction.Id), transaction.TransactionNumber)
+            onClick: _ => blades.Push(this, new TransactionDetailBlade(transaction.Id, () => refreshToken.Refresh()), transaction.TransactionNumber)
         ));
         
-        return Layout.Vertical()
-            .Gap(16)
-            .Padding(24)
-            .Add(Layout.Horizontal()
-                .Gap(12)
-                .Add(Text.H3("Transactions"))
-                .Add(new Button("Add Transaction", _ => client.Toast("Add transaction"))
+        var mainContent = BladeHelper.WithHeader(
+            Layout.Horizontal()
+                .Gap(4)
+                .Add(searchQuery.ToSearchInput().Placeholder("Search by transaction number, description, or reference..."))
+                .Add(new Button("Add Transaction")
                     .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)))
-            .Add(transactions.Count == 0 
-                ? Text.Block("No transactions found. Add your first transaction!")
-                : new List(listItems));
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => isNewTransactionOpen.Set(true))),
+            transactions.Count == 0 
+                ? Text.Block("No transactions found. Try a different search or add your first transaction!")
+                : new List(listItems)
+        );
+
+        return isNewTransactionOpen.Value ? new Sheet(
+            (Event<Sheet> _) => isNewTransactionOpen.Set(false),
+            new TransactionFormSheet(null, () => {
+                isNewTransactionOpen.Set(false);
+                refreshToken.Refresh();
+            }),
+            title: "New Transaction",
+            description: "Add a new accounting transaction"
+        ).Width(Size.Fraction(1/3f)) : mainContent;
     }
 }
 
-public class TransactionDetailBlade(int transactionId) : ViewBase
+public class TransactionDetailBlade(int transactionId, Action? onRefresh = null) : ViewBase
 {
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
         
-        var transaction = context.Transactions.FirstOrDefault(t => t.Id == transactionId);
+        var initialTransaction = context.Transactions.FirstOrDefault(t => t.Id == transactionId);
         
-        if (transaction == null)
-            return "Transaction not found";
+        if (initialTransaction == null)
+        {
+            return Layout.Vertical()
+                .Gap(4)
+                .Add(Text.H3("Transaction Not Found"))
+                .Add(new Button("Go Back", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary));
+        }
         
-        return new Card(
-            Layout.Vertical()
-                .Gap(16)
-                .Padding(16)
-                .Add($"Transaction #{transaction.TransactionNumber}")
-                .Add(Layout.Vertical()
-                    .Gap(8)
-                    .Add($"Date: {transaction.TransactionDate:MMM dd, yyyy}")
-                    .Add($"Description: {transaction.Description}")
-                    .Add($"Debit: ${transaction.DebitAmount:N2}")
-                    .Add($"Credit: ${transaction.CreditAmount:N2}")
-                    .Add($"Reference: {transaction.Reference}"))
-                .Add(new Button("Edit", _ => client.Toast("Edit transaction"))
-                    .Variant(ButtonVariant.Primary))
-        );
+        var transactionData = this.UseState(initialTransaction);
+        var isEditOpen = this.UseState(false);
+        var refreshToken = this.UseRefreshToken();
+        
+        // Refresh transaction data when refresh token changes
+        this.UseEffect(() =>
+        {
+            var updatedTransaction = context.Transactions.FirstOrDefault(t => t.Id == transactionId);
+            if (updatedTransaction != null)
+            {
+                transactionData.Set(updatedTransaction);
+            }
+        }, [refreshToken.ToTrigger()]);
+        
+        var transactionDetails = new
+        {
+            TransactionNumber = $"#{transactionData.Value.TransactionNumber}",
+            Date = transactionData.Value.TransactionDate.ToString("MMM dd, yyyy"),
+            Description = transactionData.Value.Description,
+            DebitAmount = $"${transactionData.Value.DebitAmount:N2}",
+            CreditAmount = $"${transactionData.Value.CreditAmount:N2}",
+            Reference = transactionData.Value.Reference
+        };
+        
+        return Layout.Vertical()
+            .Gap(4)
+            .Add(Text.H3($"Transaction {transactionData.Value.TransactionNumber}"))
+            .Add(transactionDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(new Button("Edit Transaction")
+                    .Variant(ButtonVariant.Outline)
+                    .Icon(Icons.Pencil)
+                    .HandleClick(_ => isEditOpen.Set(true)))
+                .Add(new Button("Delete Transaction")
+                    .Variant(ButtonVariant.Destructive)
+                    .Icon(Icons.Trash)
+                    .HandleClick(_ => {
+                        try
+                        {
+                            var transactionToDelete = context.Transactions.FirstOrDefault(t => t.Id == transactionId);
+                            if (transactionToDelete != null)
+                            {
+                                context.Transactions.Remove(transactionToDelete);
+                                context.SaveChanges();
+                                client.Toast($"Transaction {transactionData.Value.TransactionNumber} deleted successfully!");
+                                refreshToken.Refresh();
+                                onRefresh?.Invoke();
+                                blades.Pop();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Toast($"Error deleting transaction: {ex.Message}", "Error");
+                        }
+                    }))
+                .Add(new Button("Cancel", _ => blades.Pop())
+                    .Variant(ButtonVariant.Secondary)))
+            .Add(isEditOpen.Value ? new Sheet(
+                (Event<Sheet> _) => isEditOpen.Set(false),
+                new TransactionFormSheet(transactionId, () => {
+                    isEditOpen.Set(false);
+                    refreshToken.Refresh();
+                    onRefresh?.Invoke();
+                }),
+                title: "Edit Transaction",
+                description: $"Edit transaction {transactionData.Value.TransactionNumber}"
+            ).Width(Size.Fraction(1/3f)) : null);
     }
 }
 
@@ -843,6 +927,185 @@ public class AccountFormSheet(int? accountId = null, Action? onClose = null) : V
                             accountForm.Set(updated);
                         }).Placeholder("Account description...").Variant(TextInputs.Textarea))
                 ).Title("Description"))
+        );
+    }
+}
+
+public class TransactionFormSheet(int? transactionId = null, Action? onClose = null) : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        
+        var isEdit = transactionId.HasValue;
+        var existingTransaction = isEdit ? context.Transactions.FirstOrDefault(t => t.Id == transactionId!.Value) : null;
+        
+        var transactionForm = this.UseState(existingTransaction ?? new Transaction
+        {
+            TransactionNumber = $"TXN-{DateTime.Now:yyyyMMdd-HHmmss}",
+            TransactionDate = DateTime.UtcNow,
+            Description = "",
+            DebitAmount = 0.00m,
+            CreditAmount = 0.00m,
+            Reference = ""
+        });
+        
+        return new FooterLayout(
+            Layout.Horizontal().Gap(2)
+                .Add(new Button("Save")
+                    .Variant(ButtonVariant.Primary)
+                    .HandleClick(_ => {
+                        try
+                        {
+                            // Client-side validation
+                            if (string.IsNullOrWhiteSpace(transactionForm.Value.TransactionNumber))
+                            {
+                                client.Toast("Transaction Number is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (string.IsNullOrWhiteSpace(transactionForm.Value.Description))
+                            {
+                                client.Toast("Description is required", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.DebitAmount < 0)
+                            {
+                                client.Toast("Debit amount cannot be negative", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.CreditAmount < 0)
+                            {
+                                client.Toast("Credit amount cannot be negative", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.DebitAmount == 0 && transactionForm.Value.CreditAmount == 0)
+                            {
+                                client.Toast("Either debit or credit amount must be greater than zero", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.DebitAmount > 0 && transactionForm.Value.CreditAmount > 0)
+                            {
+                                client.Toast("Cannot have both debit and credit amounts", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.TransactionNumber.Length > 50)
+                            {
+                                client.Toast("Transaction Number cannot exceed 50 characters", "Validation Error");
+                                return;
+                            }
+                            
+                            if (transactionForm.Value.Description.Length > 500)
+                            {
+                                client.Toast("Description cannot exceed 500 characters", "Validation Error");
+                                return;
+                            }
+                            
+                            if (isEdit && existingTransaction != null)
+                            {
+                                // Update existing transaction
+                                existingTransaction.TransactionNumber = transactionForm.Value.TransactionNumber;
+                                existingTransaction.TransactionDate = transactionForm.Value.TransactionDate;
+                                existingTransaction.Description = transactionForm.Value.Description;
+                                existingTransaction.DebitAmount = transactionForm.Value.DebitAmount;
+                                existingTransaction.CreditAmount = transactionForm.Value.CreditAmount;
+                                existingTransaction.Reference = transactionForm.Value.Reference;
+                                existingTransaction.UpdatedAt = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                // Create new transaction
+                                var newTransaction = new Transaction
+                                {
+                                    TransactionNumber = transactionForm.Value.TransactionNumber,
+                                    TransactionDate = transactionForm.Value.TransactionDate,
+                                    Description = transactionForm.Value.Description,
+                                    DebitAmount = transactionForm.Value.DebitAmount,
+                                    CreditAmount = transactionForm.Value.CreditAmount,
+                                    Reference = transactionForm.Value.Reference,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                context.Transactions.Add(newTransaction);
+                            }
+                            
+                            context.SaveChanges();
+                            client.Toast(isEdit ? "Transaction updated successfully!" : "Transaction created successfully!");
+                            onClose?.Invoke();
+                        }
+                        catch (Exception ex)
+                        {
+                            client.Toast($"Error: {ex.Message}", "Error");
+                        }
+                    }))
+                .Add(new Button("Cancel")
+                    .Variant(ButtonVariant.Outline)
+                    .HandleClick(_ => onClose?.Invoke())),
+            
+            Layout.Vertical().Gap(4)
+                .Add(new Card(
+                    Layout.Vertical().Gap(3)
+                        .Add(Text.Small("Transaction Information"))
+                        .Add(Text.Small("Transaction Number"))
+                        .Add(new TextInput(transactionForm.Value.TransactionNumber, e => {
+                            var updated = transactionForm.Value;
+                            updated.TransactionNumber = e.Value;
+                            transactionForm.Set(updated);
+                        }).Placeholder("TXN-001").Disabled(isEdit))
+                        .Add(Text.Small("Transaction Date"))
+                        .Add(new DateTimeInput<DateTime>(transactionForm.Value.TransactionDate, e => {
+                            var updated = transactionForm.Value;
+                            updated.TransactionDate = e.Value;
+                            transactionForm.Set(updated);
+                        }))
+                        .Add(Text.Small("Description"))
+                        .Add(new TextInput(transactionForm.Value.Description, e => {
+                            var updated = transactionForm.Value;
+                            updated.Description = e.Value;
+                            transactionForm.Set(updated);
+                        }).Placeholder("Transaction description...").Variant(TextInputs.Textarea))
+                        .Add(Text.Small("Reference"))
+                        .Add(new TextInput(transactionForm.Value.Reference, e => {
+                            var updated = transactionForm.Value;
+                            updated.Reference = e.Value;
+                            transactionForm.Set(updated);
+                        }).Placeholder("Reference number or code"))
+                ).Title("Transaction Details"))
+                
+                .Add(new Card(
+                    Layout.Vertical().Gap(3)
+                        .Add(Text.Small("Amount Information"))
+                        .Add(Text.Small("Debit Amount ($)"))
+                        .Add(new NumberInput<decimal>(transactionForm.Value.DebitAmount, v => {
+                            var updated = transactionForm.Value;
+                            updated.DebitAmount = v;
+                            if (v > 0)
+                            {
+                                updated.CreditAmount = 0;
+                            }
+                            transactionForm.Set(updated);
+                        }).Placeholder("0.00"))
+                        .Add(Text.Small("Credit Amount ($)"))
+                        .Add(new NumberInput<decimal>(transactionForm.Value.CreditAmount, v => {
+                            var updated = transactionForm.Value;
+                            updated.CreditAmount = v;
+                            if (v > 0)
+                            {
+                                updated.DebitAmount = 0;
+                            }
+                            transactionForm.Set(updated);
+                        }).Placeholder("0.00"))
+                        .Add(Text.Small("Transaction Type"))
+                        .Add(Text.Block(transactionForm.Value.DebitAmount > 0 ? "Debit Transaction" : 
+                                      transactionForm.Value.CreditAmount > 0 ? "Credit Transaction" : 
+                                      "No amount entered").Variant(TextVariants.Large))
+                ).Title("Amounts"))
         );
     }
 }
