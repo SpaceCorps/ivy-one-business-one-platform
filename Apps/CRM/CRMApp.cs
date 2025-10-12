@@ -25,7 +25,7 @@ public class CRMApp : ViewBase
             }
         }, []);
 
-        return this.UseBlades(() => new CRMRootBlade(), "CRM", Size.Units(110));
+        return this.UseBlades(() => new QuickActionsBlade(), "CRM", Size.Units(140));
     }
 
     private static async System.Threading.Tasks.Task SeedCRMDataAsync()
@@ -293,11 +293,11 @@ public class CRMRootBlade : ViewBase
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         var refreshToken = this.UseRefreshToken();
-        
+
         var contacts = context.Contacts.Include(c => c.Opportunities).ToList();
         var leads = context.Leads.ToList();
         var opportunities = context.Opportunities.Include(o => o.Contact).ToList();
-        
+
         var menuItems = new[]
         {
             new ListItem("Contacts",
@@ -316,42 +316,44 @@ public class CRMRootBlade : ViewBase
                 badge: opportunities.Count.ToString(),
                 onClick: _ => blades.Push(this, new OpportunitiesBlade(), "Opportunities"))
         };
-        
+
         // Calculate metrics
         var totalPipelineValue = opportunities.Sum(o => o.Amount);
         var qualifiedLeads = leads.Count(l => l.Status == "Qualified");
         var activeOpportunities = opportunities.Count(o => o.Stage != "Closed Won" && o.Stage != "Closed Lost");
         var wonOpportunities = opportunities.Where(o => o.Stage == "Closed Won").Sum(o => o.Amount);
-        
+
         // Lead source distribution
         var leadSourceData = leads
             .GroupBy(l => l.Source)
             .Select(g => new { Source = g.Key, Count = g.Count() })
             .ToArray();
-        
+
         // Opportunity stage distribution
         var opportunityStageData = opportunities
             .GroupBy(o => o.Stage)
             .Select(g => new { Stage = g.Key, Count = g.Count(), Value = g.Sum(o => o.Amount) })
             .ToArray();
-        
+
         // Monthly opportunity creation trend
         var monthlyOpportunities = opportunities
             .Where(o => o.CreatedAt >= DateTime.UtcNow.AddMonths(-12))
             .GroupBy(o => new { o.CreatedAt.Year, o.CreatedAt.Month })
-            .Select(g => new { 
-                Month = $"{g.Key.Year}-{g.Key.Month:D2}", 
+            .Select(g => new
+            {
+                Month = $"{g.Key.Year}-{g.Key.Month:D2}",
                 Count = g.Count(),
                 Value = g.Sum(o => o.Amount)
             })
             .OrderBy(x => x.Month)
             .ToArray();
-        
+
         // Top contacts by opportunity value
         var topContactsByValue = contacts
             .Where(c => c.Opportunities.Any())
-            .Select(c => new { 
-                Contact = $"{c.FirstName} {c.LastName}", 
+            .Select(c => new
+            {
+                Contact = $"{c.FirstName} {c.LastName}",
                 Value = c.Opportunities.Sum(o => o.Amount),
                 Count = c.Opportunities.Count
             })
@@ -436,10 +438,37 @@ public class CRMRootBlade : ViewBase
                             .Dimension("Contact", e => e.Contact)
                             .Measure("Value", e => e.Sum(f => f.Value))
                         : Text.Small("No contact data")
-                ).Title("Top Contacts by Value")))
+                ).Title("Top Contacts by Value")));
+    }
+}
+
+public class RecentContactsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        var refreshToken = this.UseRefreshToken();
+
+        var contacts = context.Contacts
+            .Include(c => c.Opportunities)
+            .OrderByDescending(c => c.CreatedAt)
+            .Take(10)
+            .ToList();
+
+        return Layout.Vertical()
+            .Gap(4)
+            .Padding(2)
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(Text.H2("Recent Contacts"))
+                .Add(new Button("+ Add Contact", _ => { })
+                    .Icon(Icons.Plus)
+                    .Variant(ButtonVariant.Primary)))
             .Add(new Card(
                 contacts.Count > 0
-                    ? new List(contacts.Take(5).Select(c => new ListItem(
+                    ? new List(contacts.Select(c => new ListItem(
                         title: $"{c.FirstName} {c.LastName}",
                         subtitle: $"{c.Company} - {c.Opportunities.Count} opportunities",
                         icon: Icons.User,
@@ -451,10 +480,87 @@ public class CRMRootBlade : ViewBase
                         .Padding(4)
                         .Add(Text.H4("No contacts found"))
                         .Add(Text.P("Add your first contact to get started"))
-            ).Title("Recent Contacts"))
+            ).Title("Recent Contacts"));
+    }
+}
+
+public class QuickActionsBlade : ViewBase
+{
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
+        // Auto-push CRM Dashboard to the right on first load
+        var initialized = this.UseState(false);
+        if (!initialized.Value)
+        {
+            initialized.Value = true;
+            blades.Push(this, new CRMRootBlade(), "CRM Dashboard");
+        }
+
+        var contacts = context.Contacts.Include(c => c.Opportunities).ToList();
+        var leads = context.Leads.ToList();
+        var opportunities = context.Opportunities.Include(o => o.Contact).ToList();
+
+        var menuItems = new[]
+        {
+            new ListItem("Contacts",
+                subtitle: $"{contacts.Count} total, {contacts.Sum(c => c.Opportunities.Count)} opportunities",
+                icon: Icons.Users,
+                badge: contacts.Count.ToString(),
+                onClick: _ => {
+                    blades.Push(this, new ContactsBlade(), "Contacts");
+                    return default;
+                }),
+            new ListItem("Leads",
+                subtitle: $"{leads.Count} total, {leads.Count(l => l.Status == "Qualified")} qualified",
+                icon: Icons.UserPlus,
+                badge: leads.Count.ToString(),
+                onClick: _ => {
+                    blades.Push(this, new LeadsBlade(), "Leads");
+                    return default;
+                }),
+            new ListItem("Opportunities",
+                subtitle: $"${opportunities.Sum(o => o.Amount):N2} pipeline value",
+                icon: Icons.TrendingUp,
+                badge: opportunities.Count.ToString(),
+                onClick: _ => {
+                    blades.Push(this, new OpportunitiesBlade(), "Opportunities");
+                    return default;
+                }),
+            new ListItem("CRM Dashboard",
+                subtitle: "Overview and analytics",
+                icon: Icons.Settings,
+                onClick: _ => {
+                    blades.Push(this, new CRMRootBlade(), "CRM Dashboard");
+                    return default;
+                }),
+            new ListItem("Recent Contacts",
+                subtitle: "Latest contact activity",
+                icon: Icons.Clock,
+                onClick: _ => {
+                    blades.Push(this, new RecentContactsBlade(), "Recent Contacts");
+                    return default;
+                })
+        };
+
+        return Layout.Vertical()
+            .Gap(4)
+            .Padding(2)
+            .Add(Layout.Horizontal()
+                .Gap(4)
+                .Add(Text.H2("Quick Actions"))
+                .Add(new Button("Back to Dashboard", _ => {
+                    blades.Push(this, new CRMRootBlade(), "CRM Dashboard");
+                    return default;
+                })
+                    .Icon(Icons.ArrowLeft)
+                    .Variant(ButtonVariant.Outline)))
             .Add(new Card(
                 new List(menuItems)
-            ).Title("Quick Actions"));
+            ).Title("Navigation & Actions"));
     }
 }
 
@@ -468,22 +574,22 @@ public class ContactsBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewContactOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         var query = context.Contacts.Include(c => c.Opportunities).AsQueryable();
-        
+
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
             var searchPattern = $"%{searchQuery.Value}%";
-            query = query.Where(c => 
+            query = query.Where(c =>
                 EF.Functions.Like(c.FirstName, searchPattern) ||
                 EF.Functions.Like(c.LastName, searchPattern) ||
                 EF.Functions.Like(c.Email, searchPattern) ||
                 EF.Functions.Like(c.Company, searchPattern) ||
                 EF.Functions.Like(c.JobTitle, searchPattern));
         }
-        
+
         var contacts = query.OrderByDescending(c => c.CreatedAt).ToList();
-        
+
         var listItems = contacts.Select(contact => new ListItem(
             title: $"{contact.FirstName} {contact.LastName}",
             subtitle: $"{contact.Company} - {contact.JobTitle} - {contact.Opportunities.Count} opportunities",
@@ -491,7 +597,7 @@ public class ContactsBlade : ViewBase
             badge: contact.Email,
             onClick: _ => blades.Push(this, new ContactDetailBlade(contact.Id, () => refreshToken.Refresh()), $"{contact.FirstName} {contact.LastName}")
         ));
-        
+
         var mainContent = BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(4)
@@ -500,20 +606,21 @@ public class ContactsBlade : ViewBase
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)
                     .HandleClick(_ => isNewContactOpen.Set(true))),
-            contacts.Count == 0 
+            contacts.Count == 0
                 ? Text.Block("No contacts found. Try a different search or add your first contact!")
                 : new List(listItems)
         );
 
         return isNewContactOpen.Value ? new Sheet(
             (Event<Sheet> _) => isNewContactOpen.Set(false),
-            new ContactFormSheet(null, () => {
+            new ContactFormSheet(null, () =>
+            {
                 isNewContactOpen.Set(false);
                 refreshToken.Refresh();
             }),
             title: "New Contact",
             description: "Add a new contact to your CRM"
-        ).Width(Size.Fraction(1/3f)) : mainContent;
+        ).Width(Size.Fraction(1 / 3f)) : mainContent;
     }
 }
 
@@ -524,9 +631,9 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
-        
+
         var initialContact = context.Contacts.Include(c => c.Opportunities).FirstOrDefault(c => c.Id == contactId);
-        
+
         if (initialContact == null)
         {
             return Layout.Vertical()
@@ -535,11 +642,11 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
                 .Add(new Button("Go Back", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary));
         }
-        
+
         var contactData = this.UseState(initialContact);
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         // Refresh contact data when refresh token changes
         this.UseEffect(() =>
         {
@@ -549,7 +656,7 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
                 contactData.Set(updatedContact);
             }
         }, [refreshToken.ToTrigger()]);
-        
+
         var contactDetails = new
         {
             Name = $"{contactData.Value.FirstName} {contactData.Value.LastName}",
@@ -562,7 +669,7 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
             OpportunitiesCount = $"{contactData.Value.Opportunities.Count} opportunities",
             Notes = contactData.Value.Notes
         };
-        
+
         return Layout.Vertical()
             .Gap(4)
             .Add(Text.H3($"{contactData.Value.FirstName} {contactData.Value.LastName}"))
@@ -576,7 +683,8 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
                 .Add(new Button("Delete Contact")
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             var contactToDelete = context.Contacts.FirstOrDefault(c => c.Id == contactId);
@@ -599,14 +707,15 @@ public class ContactDetailBlade(int contactId, Action? onRefresh = null) : ViewB
                     .Variant(ButtonVariant.Secondary)))
             .Add(isEditOpen.Value ? new Sheet(
                 (Event<Sheet> _) => isEditOpen.Set(false),
-                new ContactFormSheet(contactId, () => {
+                new ContactFormSheet(contactId, () =>
+                {
                     isEditOpen.Set(false);
                     refreshToken.Refresh();
                     onRefresh?.Invoke();
                 }),
                 title: "Edit Contact",
                 description: $"Edit contact {contactData.Value.FirstName} {contactData.Value.LastName}"
-            ).Width(Size.Fraction(1/3f)) : null);
+            ).Width(Size.Fraction(1 / 3f)) : null);
     }
 }
 
@@ -620,13 +729,13 @@ public class LeadsBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewLeadOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         var query = context.Leads.AsQueryable();
-        
+
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
             var searchPattern = $"%{searchQuery.Value}%";
-            query = query.Where(l => 
+            query = query.Where(l =>
                 EF.Functions.Like(l.FirstName, searchPattern) ||
                 EF.Functions.Like(l.LastName, searchPattern) ||
                 EF.Functions.Like(l.Email, searchPattern) ||
@@ -634,9 +743,9 @@ public class LeadsBlade : ViewBase
                 EF.Functions.Like(l.Status, searchPattern) ||
                 EF.Functions.Like(l.Source, searchPattern));
         }
-        
+
         var leads = query.OrderByDescending(l => l.CreatedAt).ToList();
-        
+
         var listItems = leads.Select(lead => new ListItem(
             title: $"{lead.FirstName} {lead.LastName}",
             subtitle: $"{lead.Company} - {lead.JobTitle} - ${lead.EstimatedValue:N2}",
@@ -644,7 +753,7 @@ public class LeadsBlade : ViewBase
             badge: lead.Status,
             onClick: _ => blades.Push(this, new LeadDetailBlade(lead.Id, () => refreshToken.Refresh()), $"{lead.FirstName} {lead.LastName}")
         ));
-        
+
         var mainContent = BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(4)
@@ -653,20 +762,21 @@ public class LeadsBlade : ViewBase
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)
                     .HandleClick(_ => isNewLeadOpen.Set(true))),
-            leads.Count == 0 
+            leads.Count == 0
                 ? Text.Block("No leads found. Try a different search or add your first lead!")
                 : new List(listItems)
         );
 
         return isNewLeadOpen.Value ? new Sheet(
             (Event<Sheet> _) => isNewLeadOpen.Set(false),
-            new LeadFormSheet(null, () => {
+            new LeadFormSheet(null, () =>
+            {
                 isNewLeadOpen.Set(false);
                 refreshToken.Refresh();
             }),
             title: "New Lead",
             description: "Add a new lead to your CRM"
-        ).Width(Size.Fraction(1/3f)) : mainContent;
+        ).Width(Size.Fraction(1 / 3f)) : mainContent;
     }
 }
 
@@ -677,9 +787,9 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
-        
+
         var initialLead = context.Leads.FirstOrDefault(l => l.Id == leadId);
-        
+
         if (initialLead == null)
         {
             return Layout.Vertical()
@@ -688,11 +798,11 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
                 .Add(new Button("Go Back", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary));
         }
-        
+
         var leadData = this.UseState(initialLead);
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         this.UseEffect(() =>
         {
             var updatedLead = context.Leads.FirstOrDefault(l => l.Id == leadId);
@@ -701,7 +811,7 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
                 leadData.Set(updatedLead);
             }
         }, [refreshToken.ToTrigger()]);
-        
+
         var statusBadge = new Badge(leadData.Value.Status)
             .Variant(leadData.Value.Status == "Qualified" ? BadgeVariant.Success :
                    leadData.Value.Status == "Converted" ? BadgeVariant.Primary :
@@ -719,14 +829,15 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
             Status = statusBadge,
             Notes = leadData.Value.Notes
         };
-        
+
         return Layout.Vertical()
             .Gap(4)
             .Add(Text.H3($"{leadData.Value.FirstName} {leadData.Value.LastName}"))
             .Add(leadDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Notes))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(new Button("Qualify Lead", _ => {
+                .Add(new Button("Qualify Lead", _ =>
+                {
                     var dbLead = context.Leads.FirstOrDefault(l => l.Id == leadId);
                     if (dbLead != null)
                     {
@@ -747,7 +858,8 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
                 .Add(new Button("Delete Lead")
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             var leadToDelete = context.Leads.FirstOrDefault(l => l.Id == leadId);
@@ -770,14 +882,15 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
                     .Variant(ButtonVariant.Secondary)))
             .Add(isEditOpen.Value ? new Sheet(
                 (Event<Sheet> _) => isEditOpen.Set(false),
-                new LeadFormSheet(leadId, () => {
+                new LeadFormSheet(leadId, () =>
+                {
                     isEditOpen.Set(false);
                     refreshToken.Refresh();
                     onRefresh?.Invoke();
                 }),
                 title: "Edit Lead",
                 description: $"Edit lead {leadData.Value.FirstName} {leadData.Value.LastName}"
-            ).Width(Size.Fraction(1/3f)) : null);
+            ).Width(Size.Fraction(1 / 3f)) : null);
     }
 }
 
@@ -791,21 +904,21 @@ public class OpportunitiesBlade : ViewBase
         var searchQuery = this.UseState("");
         var isNewOpportunityOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         var query = context.Opportunities.Include(o => o.Contact).AsQueryable();
-        
+
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
             var searchPattern = $"%{searchQuery.Value}%";
-            query = query.Where(o => 
+            query = query.Where(o =>
                 EF.Functions.Like(o.Name, searchPattern) ||
                 EF.Functions.Like(o.Stage, searchPattern) ||
                 EF.Functions.Like(o.Contact.FirstName, searchPattern) ||
                 EF.Functions.Like(o.Contact.LastName, searchPattern));
         }
-        
+
         var opportunities = query.ToList().OrderByDescending(o => o.Amount).ToList();
-        
+
         var listItems = opportunities.Select(opp => new ListItem(
             title: opp.Name,
             subtitle: $"{opp.Contact.FirstName} {opp.Contact.LastName} - ${opp.Amount:N2} - {opp.Probability}%",
@@ -813,7 +926,7 @@ public class OpportunitiesBlade : ViewBase
             badge: opp.Stage,
             onClick: _ => blades.Push(this, new OpportunityDetailBlade(opp.Id, () => refreshToken.Refresh()), opp.Name)
         ));
-        
+
         var mainContent = BladeHelper.WithHeader(
             Layout.Horizontal()
                 .Gap(4)
@@ -822,20 +935,21 @@ public class OpportunitiesBlade : ViewBase
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)
                     .HandleClick(_ => isNewOpportunityOpen.Set(true))),
-            opportunities.Count == 0 
+            opportunities.Count == 0
                 ? Text.Block("No opportunities found. Try a different search or add your first opportunity!")
                 : new List(listItems)
         );
 
         return isNewOpportunityOpen.Value ? new Sheet(
             (Event<Sheet> _) => isNewOpportunityOpen.Set(false),
-            new OpportunityFormSheet(null, () => {
+            new OpportunityFormSheet(null, () =>
+            {
                 isNewOpportunityOpen.Set(false);
                 refreshToken.Refresh();
             }),
             title: "New Opportunity",
             description: "Add a new sales opportunity"
-        ).Width(Size.Fraction(1/3f)) : mainContent;
+        ).Width(Size.Fraction(1 / 3f)) : mainContent;
     }
 }
 
@@ -846,9 +960,9 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
-        
+
         var initialOpportunity = context.Opportunities.Include(o => o.Contact).FirstOrDefault(o => o.Id == opportunityId);
-        
+
         if (initialOpportunity == null)
         {
             return Layout.Vertical()
@@ -857,11 +971,11 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
                 .Add(new Button("Go Back", _ => blades.Pop())
                     .Variant(ButtonVariant.Secondary));
         }
-        
+
         var opportunityData = this.UseState(initialOpportunity);
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
-        
+
         this.UseEffect(() =>
         {
             var updatedOpportunity = context.Opportunities.Include(o => o.Contact).FirstOrDefault(o => o.Id == opportunityId);
@@ -870,7 +984,7 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
                 opportunityData.Set(updatedOpportunity);
             }
         }, [refreshToken.ToTrigger()]);
-        
+
         var stageBadge = new Badge(opportunityData.Value.Stage)
             .Variant(opportunityData.Value.Stage == "Closed Won" ? BadgeVariant.Success :
                    opportunityData.Value.Stage == "Closed Lost" ? BadgeVariant.Destructive :
@@ -887,14 +1001,15 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
             Stage = stageBadge,
             Notes = opportunityData.Value.Notes
         };
-        
+
         return Layout.Vertical()
             .Gap(4)
             .Add(Text.H3(opportunityData.Value.Name))
             .Add(opportunityDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description).MultiLine(x => x.Notes))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(opportunityData.Value.Stage != "Closed Won" ? new Button("Mark as Won", _ => {
+                .Add(opportunityData.Value.Stage != "Closed Won" ? new Button("Mark as Won", _ =>
+                {
                     var dbOpportunity = context.Opportunities.FirstOrDefault(o => o.Id == opportunityId);
                     if (dbOpportunity != null)
                     {
@@ -909,7 +1024,8 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Check)
                     : null)
-                .Add(opportunityData.Value.Stage != "Closed Lost" ? new Button("Mark as Lost", _ => {
+                .Add(opportunityData.Value.Stage != "Closed Lost" ? new Button("Mark as Lost", _ =>
+                {
                     var dbOpportunity = context.Opportunities.FirstOrDefault(o => o.Id == opportunityId);
                     if (dbOpportunity != null)
                     {
@@ -931,7 +1047,8 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
                 .Add(new Button("Delete Opportunity")
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             var opportunityToDelete = context.Opportunities.FirstOrDefault(o => o.Id == opportunityId);
@@ -954,14 +1071,15 @@ public class OpportunityDetailBlade(int opportunityId, Action? onRefresh = null)
                     .Variant(ButtonVariant.Secondary)))
             .Add(isEditOpen.Value ? new Sheet(
                 (Event<Sheet> _) => isEditOpen.Set(false),
-                new OpportunityFormSheet(opportunityId, () => {
+                new OpportunityFormSheet(opportunityId, () =>
+                {
                     isEditOpen.Set(false);
                     refreshToken.Refresh();
                     onRefresh?.Invoke();
                 }),
                 title: "Edit Opportunity",
                 description: $"Edit opportunity {opportunityData.Value.Name}"
-            ).Width(Size.Fraction(1/3f)) : null);
+            ).Width(Size.Fraction(1 / 3f)) : null);
     }
 }
 
@@ -985,15 +1103,15 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
         CreatedAt = source.CreatedAt,
         UpdatedAt = source.UpdatedAt
     };
-    
+
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        
+
         var isEdit = contactId.HasValue;
         var existingContact = isEdit ? context.Contacts.FirstOrDefault(c => c.Id == contactId!.Value) : null;
-        
+
         var contactForm = this.UseState(existingContact ?? new Contact
         {
             FirstName = "",
@@ -1009,12 +1127,13 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
             Country = "",
             Notes = ""
         });
-        
+
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
                 .Add(new Button("Save")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             if (string.IsNullOrWhiteSpace(contactForm.Value.FirstName))
@@ -1022,25 +1141,25 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                                 client.Toast("First Name is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (string.IsNullOrWhiteSpace(contactForm.Value.LastName))
                             {
                                 client.Toast("Last Name is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (string.IsNullOrWhiteSpace(contactForm.Value.Email))
                             {
                                 client.Toast("Email is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (contactForm.Value.FirstName.Length > 100 || contactForm.Value.LastName.Length > 100)
                             {
                                 client.Toast("First Name and Last Name cannot exceed 100 characters", "Validation Error");
                                 return;
                             }
-                            
+
                             if (isEdit && existingContact != null)
                             {
                                 existingContact.FirstName = contactForm.Value.FirstName;
@@ -1078,7 +1197,7 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                                 };
                                 context.Contacts.Add(newContact);
                             }
-                            
+
                             context.SaveChanges();
                             client.Toast(isEdit ? "Contact updated successfully!" : "Contact created successfully!");
                             onClose?.Invoke();
@@ -1091,94 +1210,106 @@ public class ContactFormSheet(int? contactId = null, Action? onClose = null) : V
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
                     .HandleClick(_ => onClose?.Invoke())),
-            
+
             Layout.Vertical().Gap(4)
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Personal Information"))
                         .Add(Text.Small("First Name"))
-                        .Add(new TextInput(contactForm.Value.FirstName, e => {
+                        .Add(new TextInput(contactForm.Value.FirstName, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.FirstName = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("John"))
                         .Add(Text.Small("Last Name"))
-                        .Add(new TextInput(contactForm.Value.LastName, e => {
+                        .Add(new TextInput(contactForm.Value.LastName, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.LastName = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("Doe"))
                         .Add(Text.Small("Email"))
-                        .Add(new TextInput(contactForm.Value.Email, e => {
+                        .Add(new TextInput(contactForm.Value.Email, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Email = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("john@example.com"))
                         .Add(Text.Small("Phone"))
-                        .Add(new TextInput(contactForm.Value.Phone, e => {
+                        .Add(new TextInput(contactForm.Value.Phone, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Phone = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("+1 (555) 123-4567"))
                 ).Title("Contact Details"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Company Information"))
                         .Add(Text.Small("Company"))
-                        .Add(new TextInput(contactForm.Value.Company, e => {
+                        .Add(new TextInput(contactForm.Value.Company, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Company = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("Acme Corp"))
                         .Add(Text.Small("Job Title"))
-                        .Add(new TextInput(contactForm.Value.JobTitle, e => {
+                        .Add(new TextInput(contactForm.Value.JobTitle, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.JobTitle = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("Sales Manager"))
                 ).Title("Company"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Address Information"))
                         .Add(Text.Small("Address"))
-                        .Add(new TextInput(contactForm.Value.Address, e => {
+                        .Add(new TextInput(contactForm.Value.Address, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Address = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("123 Main St"))
                         .Add(Text.Small("City"))
-                        .Add(new TextInput(contactForm.Value.City, e => {
+                        .Add(new TextInput(contactForm.Value.City, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.City = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("New York"))
                         .Add(Text.Small("State"))
-                        .Add(new TextInput(contactForm.Value.State, e => {
+                        .Add(new TextInput(contactForm.Value.State, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.State = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("NY"))
                         .Add(Text.Small("Zip Code"))
-                        .Add(new TextInput(contactForm.Value.ZipCode, e => {
+                        .Add(new TextInput(contactForm.Value.ZipCode, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.ZipCode = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("10001"))
                         .Add(Text.Small("Country"))
-                        .Add(new TextInput(contactForm.Value.Country, e => {
+                        .Add(new TextInput(contactForm.Value.Country, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Country = e.Value;
                             contactForm.Set(cloned);
                         }).Placeholder("USA"))
                 ).Title("Address"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
-                        .Add(new TextInput(contactForm.Value.Notes, e => {
+                        .Add(new TextInput(contactForm.Value.Notes, e =>
+                        {
                             var cloned = CloneContact(contactForm.Value);
                             cloned.Notes = e.Value;
                             contactForm.Set(cloned);
@@ -1206,15 +1337,15 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
         CreatedAt = source.CreatedAt,
         UpdatedAt = source.UpdatedAt
     };
-    
+
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        
+
         var isEdit = leadId.HasValue;
         var existingLead = isEdit ? context.Leads.FirstOrDefault(l => l.Id == leadId!.Value) : null;
-        
+
         var leadForm = this.UseState(existingLead ?? new Lead
         {
             FirstName = "",
@@ -1228,15 +1359,16 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
             EstimatedValue = 0.00m,
             Notes = ""
         });
-        
+
         var statusOptions = new[] { "New", "Qualified", "Contacted", "Converted", "Lost" };
         var sourceOptions = new[] { "Website", "Referral", "Cold Call", "Email", "Social Media", "Event", "Other" };
-        
+
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
                 .Add(new Button("Save")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             if (string.IsNullOrWhiteSpace(leadForm.Value.FirstName))
@@ -1244,25 +1376,25 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                                 client.Toast("First Name is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (string.IsNullOrWhiteSpace(leadForm.Value.LastName))
                             {
                                 client.Toast("Last Name is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (string.IsNullOrWhiteSpace(leadForm.Value.Email))
                             {
                                 client.Toast("Email is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (leadForm.Value.EstimatedValue < 0)
                             {
                                 client.Toast("Estimated Value cannot be negative", "Validation Error");
                                 return;
                             }
-                            
+
                             if (isEdit && existingLead != null)
                             {
                                 existingLead.FirstName = leadForm.Value.FirstName;
@@ -1296,7 +1428,7 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                                 };
                                 context.Leads.Add(newLead);
                             }
-                            
+
                             context.SaveChanges();
                             client.Toast(isEdit ? "Lead updated successfully!" : "Lead created successfully!");
                             onClose?.Invoke();
@@ -1309,77 +1441,87 @@ public class LeadFormSheet(int? leadId = null, Action? onClose = null) : ViewBas
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
                     .HandleClick(_ => onClose?.Invoke())),
-            
+
             Layout.Vertical().Gap(4)
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Lead Information"))
                         .Add(Text.Small("First Name"))
-                        .Add(new TextInput(leadForm.Value.FirstName, e => {
+                        .Add(new TextInput(leadForm.Value.FirstName, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.FirstName = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("John"))
                         .Add(Text.Small("Last Name"))
-                        .Add(new TextInput(leadForm.Value.LastName, e => {
+                        .Add(new TextInput(leadForm.Value.LastName, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.LastName = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("Doe"))
                         .Add(Text.Small("Email"))
-                        .Add(new TextInput(leadForm.Value.Email, e => {
+                        .Add(new TextInput(leadForm.Value.Email, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Email = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("john@example.com"))
                         .Add(Text.Small("Phone"))
-                        .Add(new TextInput(leadForm.Value.Phone, e => {
+                        .Add(new TextInput(leadForm.Value.Phone, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Phone = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("+1 (555) 123-4567"))
                         .Add(Text.Small("Company"))
-                        .Add(new TextInput(leadForm.Value.Company, e => {
+                        .Add(new TextInput(leadForm.Value.Company, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Company = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("Acme Corp"))
                         .Add(Text.Small("Job Title"))
-                        .Add(new TextInput(leadForm.Value.JobTitle, e => {
+                        .Add(new TextInput(leadForm.Value.JobTitle, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.JobTitle = e.Value;
                             leadForm.Set(cloned);
                         }).Placeholder("CEO"))
                 ).Title("Lead Details"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Lead Tracking"))
                         .Add(Text.Small("Source"))
-                        .Add(new SelectInput<string>(leadForm.Value.Source, e => {
+                        .Add(new SelectInput<string>(leadForm.Value.Source, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Source = e.Value;
                             leadForm.Set(cloned);
                         }, sourceOptions.ToOptions()))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(leadForm.Value.Status, e => {
+                        .Add(new SelectInput<string>(leadForm.Value.Status, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Status = e.Value;
                             leadForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                         .Add(Text.Small("Estimated Value ($)"))
-                        .Add(new NumberInput<decimal>(leadForm.Value.EstimatedValue, v => {
+                        .Add(new NumberInput<decimal>(leadForm.Value.EstimatedValue, v =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.EstimatedValue = v;
                             leadForm.Set(cloned);
                         }).Placeholder("0.00"))
                 ).Title("Lead Status"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
-                        .Add(new TextInput(leadForm.Value.Notes, e => {
+                        .Add(new TextInput(leadForm.Value.Notes, e =>
+                        {
                             var cloned = CloneLead(leadForm.Value);
                             cloned.Notes = e.Value;
                             leadForm.Set(cloned);
@@ -1405,17 +1547,17 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
         CreatedAt = source.CreatedAt,
         UpdatedAt = source.UpdatedAt
     };
-    
+
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
         var context = this.UseService<ApplicationDbContext>();
-        
+
         var isEdit = opportunityId.HasValue;
         var existingOpportunity = isEdit ? context.Opportunities.FirstOrDefault(o => o.Id == opportunityId!.Value) : null;
-        
+
         var contacts = context.Contacts.OrderBy(c => c.LastName).Take(50).ToList();
-        
+
         if (contacts.Count == 0 && !isEdit)
         {
             // No contacts exist, show message and prevent opportunity creation
@@ -1423,7 +1565,7 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                 .Add(Callout.Error("You must create a contact before creating an opportunity.", "No Contacts Available"))
                 .Add(new Button("Close", _ => onClose?.Invoke()));
         }
-        
+
         var opportunityForm = this.UseState(existingOpportunity ?? new Opportunity
         {
             ContactId = contacts.First().Id,
@@ -1435,14 +1577,15 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
             ExpectedCloseDate = DateTime.UtcNow.AddDays(30),
             Notes = ""
         });
-        
+
         var stageOptions = new[] { "Prospecting", "Qualification", "Proposal", "Negotiation", "Closed Won", "Closed Lost" };
-        
+
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
                 .Add(new Button("Save")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
+                    .HandleClick(_ =>
+                    {
                         try
                         {
                             if (opportunityForm.Value.ContactId == 0)
@@ -1450,25 +1593,25 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                                 client.Toast("Please select a contact for this opportunity", "Validation Error");
                                 return;
                             }
-                            
+
                             if (string.IsNullOrWhiteSpace(opportunityForm.Value.Name))
                             {
                                 client.Toast("Opportunity Name is required", "Validation Error");
                                 return;
                             }
-                            
+
                             if (opportunityForm.Value.Amount < 0)
                             {
                                 client.Toast("Amount cannot be negative", "Validation Error");
                                 return;
                             }
-                            
+
                             if (opportunityForm.Value.Probability < 0 || opportunityForm.Value.Probability > 100)
                             {
                                 client.Toast("Probability must be between 0 and 100", "Validation Error");
                                 return;
                             }
-                            
+
                             if (isEdit && existingOpportunity != null)
                             {
                                 existingOpportunity.ContactId = opportunityForm.Value.ContactId;
@@ -1498,7 +1641,7 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                                 };
                                 context.Opportunities.Add(newOpportunity);
                             }
-                            
+
                             context.SaveChanges();
                             client.Toast(isEdit ? "Opportunity updated successfully!" : "Opportunity created successfully!");
                             onClose?.Invoke();
@@ -1511,65 +1654,73 @@ public class OpportunityFormSheet(int? opportunityId = null, Action? onClose = n
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
                     .HandleClick(_ => onClose?.Invoke())),
-            
+
             Layout.Vertical().Gap(4)
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Opportunity Information"))
                         .Add(Text.Small("Opportunity Name"))
-                        .Add(new TextInput(opportunityForm.Value.Name, e => {
+                        .Add(new TextInput(opportunityForm.Value.Name, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Name = e.Value;
                             opportunityForm.Set(cloned);
                         }).Placeholder("Q1 Software License"))
                         .Add(Text.Small("Contact"))
-                        .Add(new SelectInput<int>(opportunityForm.Value.ContactId, e => {
+                        .Add(new SelectInput<int>(opportunityForm.Value.ContactId, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.ContactId = e.Value;
                             opportunityForm.Set(cloned);
                         }, contacts.Select(c => (c.Id, $"{c.FirstName} {c.LastName} - {c.Company}")).ToOptions()))
                         .Add(Text.Small("Description"))
-                        .Add(new TextInput(opportunityForm.Value.Description, e => {
+                        .Add(new TextInput(opportunityForm.Value.Description, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Description = e.Value;
                             opportunityForm.Set(cloned);
                         }).Placeholder("Opportunity description...").Variant(TextInputs.Textarea))
                 ).Title("Opportunity Details"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Sales Information"))
                         .Add(Text.Small("Amount ($)"))
-                        .Add(new NumberInput<decimal>(opportunityForm.Value.Amount, v => {
+                        .Add(new NumberInput<decimal>(opportunityForm.Value.Amount, v =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Amount = v;
                             opportunityForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Stage"))
-                        .Add(new SelectInput<string>(opportunityForm.Value.Stage, e => {
+                        .Add(new SelectInput<string>(opportunityForm.Value.Stage, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Stage = e.Value;
                             opportunityForm.Set(cloned);
                         }, stageOptions.ToOptions()))
                         .Add(Text.Small("Probability (%)"))
-                        .Add(new NumberInput<int>(opportunityForm.Value.Probability, v => {
+                        .Add(new NumberInput<int>(opportunityForm.Value.Probability, v =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Probability = v;
                             opportunityForm.Set(cloned);
                         }).Placeholder("50"))
                         .Add(Text.Small("Expected Close Date"))
-                        .Add(new DateTimeInput<DateTime>(opportunityForm.Value.ExpectedCloseDate, e => {
+                        .Add(new DateTimeInput<DateTime>(opportunityForm.Value.ExpectedCloseDate, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.ExpectedCloseDate = e.Value;
                             opportunityForm.Set(cloned);
                         }))
                 ).Title("Sales Details"))
-                
+
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Additional Information"))
                         .Add(Text.Small("Notes"))
-                        .Add(new TextInput(opportunityForm.Value.Notes, e => {
+                        .Add(new TextInput(opportunityForm.Value.Notes, e =>
+                        {
                             var cloned = CloneOpportunity(opportunityForm.Value);
                             cloned.Notes = e.Value;
                             opportunityForm.Set(cloned);
