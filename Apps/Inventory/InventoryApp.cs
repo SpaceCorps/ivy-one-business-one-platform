@@ -312,10 +312,6 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                     .Loading(loading)
                     .Disabled(loading)
                     .HandleClick(_ => HandleSubmit()))
-                .Add(new Button("Cancel")
-                    .Variant(ButtonVariant.Outline)
-                    .Disabled(loading)
-                    .HandleClick(_ => onClose?.Invoke()))
                 .Add(validationView),
             formView
         );
@@ -501,10 +497,6 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                     .Loading(loading)
                     .Disabled(loading)
                     .HandleClick(_ => HandleSubmit()))
-                .Add(new Button("Cancel")
-                    .Variant(ButtonVariant.Outline)
-                    .Disabled(loading)
-                    .HandleClick(_ => onClose?.Invoke()))
                 .Add(validationView),
             
             Layout.Vertical().Gap(4)
