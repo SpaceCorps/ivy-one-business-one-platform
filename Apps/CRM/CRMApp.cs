@@ -338,7 +338,7 @@ public class LeadDetailBlade(int leadId, Action? onRefresh = null) : ViewBase
                     }
                 })
                     .Variant(ButtonVariant.Success)
-                    .Icon(Icons.CheckCircle))
+                    .Icon(Icons.Check))
                 .Add(new Button("Edit Lead")
                     .Variant(ButtonVariant.Outline)
                     .Icon(Icons.Pencil)
