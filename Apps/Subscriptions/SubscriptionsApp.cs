@@ -201,6 +201,23 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
 
 public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose = null) : ViewBase
 {
+    private Subscription CloneSubscription(Subscription source) => new Subscription
+    {
+        Id = source.Id,
+        CustomerName = source.CustomerName,
+        CustomerEmail = source.CustomerEmail,
+        PlanName = source.PlanName,
+        MonthlyAmount = source.MonthlyAmount,
+        BillingCycle = source.BillingCycle,
+        Status = source.Status,
+        StartDate = source.StartDate,
+        EndDate = source.EndDate,
+        NextBillingDate = source.NextBillingDate,
+        PaymentMethod = source.PaymentMethod,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -307,15 +324,15 @@ public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose =
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
                         .Add(new TextInput(subscriptionForm.Value.CustomerName, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.CustomerName = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.CustomerName = e.Value;
+                            subscriptionForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Customer Email"))
                         .Add(new TextInput(subscriptionForm.Value.CustomerEmail, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.CustomerEmail = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.CustomerEmail = e.Value;
+                            subscriptionForm.Set(cloned);
                         }).Placeholder("customer@example.com"))
                 ).Title("Customer"))
                 
@@ -324,27 +341,27 @@ public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose =
                         .Add(Text.Small("Plan Information"))
                         .Add(Text.Small("Plan Name"))
                         .Add(new TextInput(subscriptionForm.Value.PlanName, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.PlanName = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.PlanName = e.Value;
+                            subscriptionForm.Set(cloned);
                         }).Placeholder("Premium Plan"))
                         .Add(Text.Small("Monthly Amount ($)"))
                         .Add(new NumberInput<decimal>(subscriptionForm.Value.MonthlyAmount, v => {
-                            var updated = subscriptionForm.Value;
-                            updated.MonthlyAmount = v;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.MonthlyAmount = v;
+                            subscriptionForm.Set(cloned);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Billing Cycle"))
                         .Add(new SelectInput<string>(subscriptionForm.Value.BillingCycle, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.BillingCycle = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.BillingCycle = e.Value;
+                            subscriptionForm.Set(cloned);
                         }, billingCycleOptions.ToOptions()))
                         .Add(Text.Small("Payment Method"))
                         .Add(new TextInput(subscriptionForm.Value.PaymentMethod, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.PaymentMethod = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.PaymentMethod = e.Value;
+                            subscriptionForm.Set(cloned);
                         }).Placeholder("Credit Card"))
                 ).Title("Plan Details"))
                 
@@ -353,21 +370,21 @@ public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose =
                         .Add(Text.Small("Subscription Timeline"))
                         .Add(Text.Small("Start Date"))
                         .Add(new DateTimeInput<DateTime>(subscriptionForm.Value.StartDate, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.StartDate = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.StartDate = e.Value;
+                            subscriptionForm.Set(cloned);
                         }))
                         .Add(Text.Small("Next Billing Date"))
                         .Add(new DateTimeInput<DateTime?>(subscriptionForm.Value.NextBillingDate, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.NextBillingDate = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.NextBillingDate = e.Value;
+                            subscriptionForm.Set(cloned);
                         }))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(subscriptionForm.Value.Status, e => {
-                            var updated = subscriptionForm.Value;
-                            updated.Status = e.Value;
-                            subscriptionForm.Set(updated);
+                            var cloned = CloneSubscription(subscriptionForm.Value);
+                            cloned.Status = e.Value;
+                            subscriptionForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Timeline"))
         );
