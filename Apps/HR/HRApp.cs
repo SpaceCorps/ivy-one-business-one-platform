@@ -172,6 +172,24 @@ public class EmployeeDetailBlade(int employeeId, Action? onRefresh = null) : Vie
 
 public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) : ViewBase
 {
+    private Employee CloneEmployee(Employee source) => new Employee
+    {
+        Id = source.Id,
+        EmployeeId = source.EmployeeId,
+        FirstName = source.FirstName,
+        LastName = source.LastName,
+        Email = source.Email,
+        Phone = source.Phone,
+        DepartmentId = source.DepartmentId,
+        JobTitle = source.JobTitle,
+        Salary = source.Salary,
+        HireDate = source.HireDate,
+        TerminationDate = source.TerminationDate,
+        Status = source.Status,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -305,33 +323,33 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                         .Add(Text.Small("Personal Information"))
                         .Add(Text.Small("Employee ID"))
                         .Add(new TextInput(employeeForm.Value.EmployeeId, e => {
-                            var updated = employeeForm.Value;
-                            updated.EmployeeId = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.EmployeeId = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("EMP-001").Disabled(isEdit))
                         .Add(Text.Small("First Name"))
                         .Add(new TextInput(employeeForm.Value.FirstName, e => {
-                            var updated = employeeForm.Value;
-                            updated.FirstName = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.FirstName = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("John"))
                         .Add(Text.Small("Last Name"))
                         .Add(new TextInput(employeeForm.Value.LastName, e => {
-                            var updated = employeeForm.Value;
-                            updated.LastName = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.LastName = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("Doe"))
                         .Add(Text.Small("Email"))
                         .Add(new TextInput(employeeForm.Value.Email, e => {
-                            var updated = employeeForm.Value;
-                            updated.Email = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.Email = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("john.doe@company.com"))
                         .Add(Text.Small("Phone"))
                         .Add(new TextInput(employeeForm.Value.Phone, e => {
-                            var updated = employeeForm.Value;
-                            updated.Phone = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.Phone = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("+1-555-0123"))
                 ).Title("Employee Details"))
                 
@@ -340,31 +358,31 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                         .Add(Text.Small("Job Information"))
                         .Add(Text.Small("Job Title"))
                         .Add(new TextInput(employeeForm.Value.JobTitle, e => {
-                            var updated = employeeForm.Value;
-                            updated.JobTitle = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.JobTitle = e.Value;
+                            employeeForm.Set(cloned);
                         }).Placeholder("Software Engineer"))
                         .Add(Text.Small("Department"))
                         .Add(new SelectInput<int>(
                             employeeForm.Value.DepartmentId,
                             e => {
-                                var updated = employeeForm.Value;
-                                updated.DepartmentId = e.Value;
-                                employeeForm.Set(updated);
+                                var cloned = CloneEmployee(employeeForm.Value);
+                                cloned.DepartmentId = e.Value;
+                                employeeForm.Set(cloned);
                             },
                             departments.Select(d => (d.Id, d.Name)).ToOptions()
                         ))
                         .Add(Text.Small("Salary ($)"))
                         .Add(new NumberInput<decimal>(employeeForm.Value.Salary, v => {
-                            var updated = employeeForm.Value;
-                            updated.Salary = v;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.Salary = v;
+                            employeeForm.Set(cloned);
                         }).Placeholder("50000"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(employeeForm.Value.Status, e => {
-                            var updated = employeeForm.Value;
-                            updated.Status = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.Status = e.Value;
+                            employeeForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Position"))
                 
@@ -373,15 +391,15 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
                         .Add(Text.Small("Employment Dates"))
                         .Add(Text.Small("Hire Date"))
                         .Add(new DateTimeInput<DateTime>(employeeForm.Value.HireDate, e => {
-                            var updated = employeeForm.Value;
-                            updated.HireDate = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.HireDate = e.Value;
+                            employeeForm.Set(cloned);
                         }))
                         .Add(Text.Small("Termination Date (Optional)"))
                         .Add(new DateTimeInput<DateTime?>(employeeForm.Value.TerminationDate, e => {
-                            var updated = employeeForm.Value;
-                            updated.TerminationDate = e.Value;
-                            employeeForm.Set(updated);
+                            var cloned = CloneEmployee(employeeForm.Value);
+                            cloned.TerminationDate = e.Value;
+                            employeeForm.Set(cloned);
                         }))
                 ).Title("Timeline"))
         );
