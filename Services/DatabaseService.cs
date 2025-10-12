@@ -166,5 +166,17 @@ public static class DatabaseService
 
         await context.PurchaseOrders.AddRangeAsync(purchaseOrders);
         await context.SaveChangesAsync();
+        
+        // Seed tickets
+        var tickets = new[]
+        {
+            new Ticket { TicketNumber = "HD-001", CustomerName = "John Doe", CustomerEmail = "john.doe@example.com", Subject = "Login Issue", Description = "Unable to login to the system", Status = "Open", Priority = "High", Category = "Technical", CreatedAt = DateTime.UtcNow.AddDays(-5) },
+            new Ticket { TicketNumber = "HD-002", CustomerName = "Jane Smith", CustomerEmail = "jane.smith@example.com", Subject = "Feature Request", Description = "Request for new reporting feature", Status = "In Progress", Priority = "Medium", Category = "Feature", AssignedTo = "Support Agent", CreatedAt = DateTime.UtcNow.AddDays(-3) },
+            new Ticket { TicketNumber = "HD-003", CustomerName = "Bob Johnson", CustomerEmail = "bob.johnson@example.com", Subject = "Bug Report", Description = "Found a bug in the invoice module", Status = "Resolved", Priority = "Low", Category = "Bug", AssignedTo = "Tech Support", ResolvedAt = DateTime.UtcNow.AddDays(-1), CreatedAt = DateTime.UtcNow.AddDays(-7) },
+            new Ticket { TicketNumber = "HD-004", CustomerName = "Alice Brown", CustomerEmail = "alice.brown@example.com", Subject = "Password Reset", Description = "Need help resetting my password", Status = "Closed", Priority = "Low", Category = "Account", AssignedTo = "Support Agent", ResolvedAt = DateTime.UtcNow.AddDays(-2), CreatedAt = DateTime.UtcNow.AddDays(-8) }
+        };
+        
+        await context.Tickets.AddRangeAsync(tickets);
+        await context.SaveChangesAsync();
     }
 }
