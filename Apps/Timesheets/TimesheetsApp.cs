@@ -3,6 +3,14 @@ using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.Timesheets;
 
+public static class TimesheetStatus
+{
+    public const string Draft = "Draft";
+    public const string Submitted = "Submitted";
+    public const string Approved = "Approved";
+    public const string Rejected = "Rejected";
+}
+
 [App(icon: Icons.Clock, title: "Timesheets", path: new[] { "Project & Time Management" })]
 public class TimesheetsApp : ViewBase
 {
@@ -92,6 +100,20 @@ public class TimesheetDetailBlade(int timesheetId, Action? onRefresh = null) : V
         var isEditOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
+        void UpdateStatus(string newStatus, string message)
+        {
+            var dbTimesheet = context.Timesheets.FirstOrDefault(t => t.Id == timesheetId);
+            if (dbTimesheet != null)
+            {
+                dbTimesheet.Status = newStatus;
+                dbTimesheet.UpdatedAt = DateTime.UtcNow;
+                context.SaveChanges();
+                client.Toast(message);
+                refreshToken.Refresh();
+                onRefresh?.Invoke();
+            }
+        }
+        
         this.UseEffect(() =>
         {
             var updatedTimesheet = context.Timesheets.Include(t => t.Project).FirstOrDefault(t => t.Id == timesheetId);
@@ -102,9 +124,9 @@ public class TimesheetDetailBlade(int timesheetId, Action? onRefresh = null) : V
         }, [refreshToken.ToTrigger()]);
         
         var statusBadge = new Badge(timesheetData.Value.Status)
-            .Variant(timesheetData.Value.Status == "Approved" ? BadgeVariant.Success :
-                   timesheetData.Value.Status == "Rejected" ? BadgeVariant.Destructive :
-                   timesheetData.Value.Status == "Submitted" ? BadgeVariant.Primary :
+            .Variant(timesheetData.Value.Status == TimesheetStatus.Approved ? BadgeVariant.Success :
+                   timesheetData.Value.Status == TimesheetStatus.Rejected ? BadgeVariant.Destructive :
+                   timesheetData.Value.Status == TimesheetStatus.Submitted ? BadgeVariant.Primary :
                    BadgeVariant.Secondary);
 
         var timesheetDetails = new
@@ -123,48 +145,18 @@ public class TimesheetDetailBlade(int timesheetId, Action? onRefresh = null) : V
             .Add(timesheetDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Description))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(timesheetData.Value.Status == "Draft" ? new Button("Submit for Approval", _ => {
-                    var dbTimesheet = context.Timesheets.FirstOrDefault(t => t.Id == timesheetId);
-                    if (dbTimesheet != null)
-                    {
-                        dbTimesheet.Status = "Submitted";
-                        dbTimesheet.UpdatedAt = DateTime.UtcNow;
-                        context.SaveChanges();
-                        client.Toast($"Timesheet submitted for approval!");
-                        refreshToken.Refresh();
-                        onRefresh?.Invoke();
-                    }
-                })
+                .Add(timesheetData.Value.Status == TimesheetStatus.Draft ? new Button("Submit for Approval", _ => 
+                    UpdateStatus(TimesheetStatus.Submitted, "Timesheet submitted for approval!"))
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Send)
                     : null)
-                .Add(timesheetData.Value.Status == "Submitted" ? new Button("Approve", _ => {
-                    var dbTimesheet = context.Timesheets.FirstOrDefault(t => t.Id == timesheetId);
-                    if (dbTimesheet != null)
-                    {
-                        dbTimesheet.Status = "Approved";
-                        dbTimesheet.UpdatedAt = DateTime.UtcNow;
-                        context.SaveChanges();
-                        client.Toast($"Timesheet approved!");
-                        refreshToken.Refresh();
-                        onRefresh?.Invoke();
-                    }
-                })
+                .Add(timesheetData.Value.Status == TimesheetStatus.Submitted ? new Button("Approve", _ => 
+                    UpdateStatus(TimesheetStatus.Approved, "Timesheet approved!"))
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Check)
                     : null)
-                .Add(timesheetData.Value.Status == "Submitted" ? new Button("Reject", _ => {
-                    var dbTimesheet = context.Timesheets.FirstOrDefault(t => t.Id == timesheetId);
-                    if (dbTimesheet != null)
-                    {
-                        dbTimesheet.Status = "Rejected";
-                        dbTimesheet.UpdatedAt = DateTime.UtcNow;
-                        context.SaveChanges();
-                        client.Toast($"Timesheet rejected!");
-                        refreshToken.Refresh();
-                        onRefresh?.Invoke();
-                    }
-                })
+                .Add(timesheetData.Value.Status == TimesheetStatus.Submitted ? new Button("Reject", _ => 
+                    UpdateStatus(TimesheetStatus.Rejected, "Timesheet rejected!"))
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.X)
                     : null)
@@ -241,10 +233,10 @@ public class TimesheetFormSheet(int? timesheetId = null, Action? onClose = null)
             Date = DateTime.UtcNow,
             HoursWorked = 0.0m,
             Description = "",
-            Status = "Draft"
+            Status = TimesheetStatus.Draft
         });
         
-        var statusOptions = new[] { "Draft", "Submitted", "Approved", "Rejected" };
+        var statusOptions = new[] { TimesheetStatus.Draft, TimesheetStatus.Submitted, TimesheetStatus.Approved, TimesheetStatus.Rejected };
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
