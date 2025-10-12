@@ -172,6 +172,20 @@ public class EmployeeDetailBlade(int employeeId, Action? onRefresh = null) : Vie
 
 public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) : ViewBase
 {
+    public record EmployeeFormModel(
+        string EmployeeId,
+        string FirstName,
+        string LastName,
+        string Email,
+        string Phone,
+        string JobTitle,
+        string DepartmentId,
+        decimal Salary,
+        string Status,
+        DateTime HireDate,
+        DateTime? TerminationDate
+    );
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -179,206 +193,129 @@ public class EmployeeFormSheet(int? employeeId = null, Action? onClose = null) :
         
         var isEdit = employeeId.HasValue;
         var existingEmployee = isEdit ? context.Employees.FirstOrDefault(e => e.Id == employeeId!.Value) : null;
-        
         var departments = context.Departments.Where(d => d.IsActive).OrderBy(d => d.Name).ToList();
         
-        var employeeForm = this.UseState(existingEmployee ?? new Employee
-        {
-            EmployeeId = $"EMP-{DateTime.Now:yyyyMMddHHmmss}",
-            FirstName = "",
-            LastName = "",
-            Email = "",
-            Phone = "",
-            JobTitle = "",
-            Salary = 50000,
-            Status = "Active",
-            HireDate = DateTime.UtcNow,
-            DepartmentId = departments.FirstOrDefault()?.Id ?? 0
-        });
+        var employeeForm = this.UseState(() => existingEmployee != null 
+            ? new EmployeeFormModel(
+                existingEmployee.EmployeeId,
+                existingEmployee.FirstName,
+                existingEmployee.LastName,
+                existingEmployee.Email,
+                existingEmployee.Phone,
+                existingEmployee.JobTitle,
+                existingEmployee.Department?.Name ?? "",
+                existingEmployee.Salary,
+                existingEmployee.Status,
+                existingEmployee.HireDate,
+                existingEmployee.TerminationDate
+            )
+            : new EmployeeFormModel(
+                $"EMP-{DateTime.Now:yyyyMMddHHmmss}",
+                "",
+                "",
+                "",
+                "",
+                "",
+                departments.FirstOrDefault()?.Name ?? "",
+                50000,
+                "Active",
+                DateTime.UtcNow,
+                null
+            ));
         
-        var departmentId = this.UseState(employeeForm.Value.DepartmentId);
-        var statusOptions = new[] { "Active", "Inactive", "Terminated" };
+        var formBuilder = employeeForm.ToForm()
+            .Group("Personal Information", m => m.EmployeeId, m => m.FirstName, m => m.LastName, m => m.Email, m => m.Phone)
+            .Group("Job Information", m => m.JobTitle, m => m.DepartmentId, m => m.Salary, m => m.Status)
+            .Group("Employment Dates", m => m.HireDate, m => m.TerminationDate)
+            .Required(m => m.EmployeeId, m => m.FirstName, m => m.LastName, m => m.Email, m => m.JobTitle, m => m.Salary)
+            .Label(m => m.EmployeeId, "Employee ID")
+            .Label(m => m.FirstName, "First Name")
+            .Label(m => m.LastName, "Last Name")
+            .Label(m => m.Email, "Email Address")
+            .Label(m => m.Phone, "Phone Number")
+            .Label(m => m.JobTitle, "Job Title")
+            .Label(m => m.DepartmentId, "Department")
+            .Label(m => m.Salary, "Annual Salary ($)")
+            .Label(m => m.Status, "Employment Status")
+            .Label(m => m.HireDate, "Hire Date")
+            .Label(m => m.TerminationDate, "Termination Date")
+            .Builder(m => m.EmployeeId, s => s.ToTextInput().Disabled(isEdit))
+            .Builder(m => m.DepartmentId, s => s.ToSelectInput(departments.Select(d => d.Name).ToOptions()))
+            .Validate<decimal>(m => m.Salary, salary => (salary > 0, "Salary must be greater than zero"))
+            .Validate<string>(m => m.FirstName, firstName => (firstName.Length <= 100, "First Name cannot exceed 100 characters"))
+            .Validate<string>(m => m.LastName, lastName => (lastName.Length <= 100, "Last Name cannot exceed 100 characters"));
+        
+        var (onSubmit, formView, validationView, loading) = formBuilder.UseForm(this.Context);
+        
+        async ValueTask HandleSubmit()
+        {
+            if (await onSubmit())
+            {
+                try
+                {
+                    if (isEdit && existingEmployee != null)
+                    {
+                        // Update existing employee
+                        existingEmployee.EmployeeId = employeeForm.Value.EmployeeId;
+                        existingEmployee.FirstName = employeeForm.Value.FirstName;
+                        existingEmployee.LastName = employeeForm.Value.LastName;
+                        existingEmployee.Email = employeeForm.Value.Email;
+                        existingEmployee.Phone = employeeForm.Value.Phone;
+                        existingEmployee.JobTitle = employeeForm.Value.JobTitle;
+                        existingEmployee.Salary = employeeForm.Value.Salary;
+                        existingEmployee.Status = employeeForm.Value.Status;
+                        existingEmployee.HireDate = employeeForm.Value.HireDate;
+                        existingEmployee.TerminationDate = employeeForm.Value.TerminationDate;
+                        existingEmployee.DepartmentId = departments.FirstOrDefault(d => d.Name == employeeForm.Value.DepartmentId)?.Id ?? 1;
+                        existingEmployee.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        // Create new employee
+                        var newEmployee = new Employee
+                        {
+                            EmployeeId = employeeForm.Value.EmployeeId,
+                            FirstName = employeeForm.Value.FirstName,
+                            LastName = employeeForm.Value.LastName,
+                            Email = employeeForm.Value.Email,
+                            Phone = employeeForm.Value.Phone,
+                            JobTitle = employeeForm.Value.JobTitle,
+                            Salary = employeeForm.Value.Salary,
+                            Status = employeeForm.Value.Status,
+                            HireDate = employeeForm.Value.HireDate,
+                            TerminationDate = employeeForm.Value.TerminationDate,
+                            DepartmentId = departments.FirstOrDefault(d => d.Name == employeeForm.Value.DepartmentId)?.Id ?? 1,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.Employees.Add(newEmployee);
+                    }
+                    
+                    context.SaveChanges();
+                    client.Toast(isEdit ? "Employee updated successfully!" : "Employee created successfully!");
+                    onClose?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    client.Toast($"Error: {ex.Message}", "Error");
+                }
+            }
+        }
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
-                .Add(new Button("Save")
+                .Add(new Button(isEdit ? "Update Employee" : "Create Employee")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            // Client-side validation
-                            if (string.IsNullOrWhiteSpace(employeeForm.Value.EmployeeId))
-                            {
-                                client.Toast("Employee ID is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(employeeForm.Value.FirstName))
-                            {
-                                client.Toast("First Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(employeeForm.Value.LastName))
-                            {
-                                client.Toast("Last Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(employeeForm.Value.Email))
-                            {
-                                client.Toast("Email is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (employeeForm.Value.Salary <= 0)
-                            {
-                                client.Toast("Salary must be greater than zero", "Validation Error");
-                                return;
-                            }
-                            
-                            if (employeeForm.Value.FirstName.Length > 100)
-                            {
-                                client.Toast("First Name cannot exceed 100 characters", "Validation Error");
-                                return;
-                            }
-                            
-                            if (employeeForm.Value.LastName.Length > 100)
-                            {
-                                client.Toast("Last Name cannot exceed 100 characters", "Validation Error");
-                                return;
-                            }
-                            
-                            if (isEdit && existingEmployee != null)
-                            {
-                                // Update existing employee
-                                existingEmployee.EmployeeId = employeeForm.Value.EmployeeId;
-                                existingEmployee.FirstName = employeeForm.Value.FirstName;
-                                existingEmployee.LastName = employeeForm.Value.LastName;
-                                existingEmployee.Email = employeeForm.Value.Email;
-                                existingEmployee.Phone = employeeForm.Value.Phone;
-                                existingEmployee.JobTitle = employeeForm.Value.JobTitle;
-                                existingEmployee.Salary = employeeForm.Value.Salary;
-                                existingEmployee.Status = employeeForm.Value.Status;
-                                existingEmployee.HireDate = employeeForm.Value.HireDate;
-                                existingEmployee.TerminationDate = employeeForm.Value.TerminationDate;
-                                existingEmployee.DepartmentId = departmentId.Value;
-                                existingEmployee.UpdatedAt = DateTime.UtcNow;
-                            }
-                            else
-                            {
-                                // Create new employee
-                                var newEmployee = new Employee
-                                {
-                                    EmployeeId = employeeForm.Value.EmployeeId,
-                                    FirstName = employeeForm.Value.FirstName,
-                                    LastName = employeeForm.Value.LastName,
-                                    Email = employeeForm.Value.Email,
-                                    Phone = employeeForm.Value.Phone,
-                                    JobTitle = employeeForm.Value.JobTitle,
-                                    Salary = employeeForm.Value.Salary,
-                                    Status = employeeForm.Value.Status,
-                                    HireDate = employeeForm.Value.HireDate,
-                                    TerminationDate = employeeForm.Value.TerminationDate,
-                                    DepartmentId = departmentId.Value,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-                                context.Employees.Add(newEmployee);
-                            }
-                            
-                            context.SaveChanges();
-                            client.Toast(isEdit ? "Employee updated successfully!" : "Employee created successfully!");
-                            onClose?.Invoke();
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error: {ex.Message}", "Error");
-                        }
-                    }))
+                    .HandleClick(_ => HandleSubmit())
+                    .Loading(loading)
+                    .Disabled(loading))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
                     .HandleClick(_ => onClose?.Invoke())),
             
             Layout.Vertical().Gap(4)
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Personal Information"))
-                        .Add(Text.Small("Employee ID"))
-                        .Add(new TextInput(employeeForm.Value.EmployeeId, e => {
-                            var updated = employeeForm.Value;
-                            updated.EmployeeId = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("EMP-001").Disabled(isEdit))
-                        .Add(Text.Small("First Name"))
-                        .Add(new TextInput(employeeForm.Value.FirstName, e => {
-                            var updated = employeeForm.Value;
-                            updated.FirstName = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("John"))
-                        .Add(Text.Small("Last Name"))
-                        .Add(new TextInput(employeeForm.Value.LastName, e => {
-                            var updated = employeeForm.Value;
-                            updated.LastName = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("Doe"))
-                        .Add(Text.Small("Email"))
-                        .Add(new TextInput(employeeForm.Value.Email, e => {
-                            var updated = employeeForm.Value;
-                            updated.Email = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("john.doe@company.com"))
-                        .Add(Text.Small("Phone"))
-                        .Add(new TextInput(employeeForm.Value.Phone, e => {
-                            var updated = employeeForm.Value;
-                            updated.Phone = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("+1-555-0123"))
-                ).Title("Employee Details"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Job Information"))
-                        .Add(Text.Small("Job Title"))
-                        .Add(new TextInput(employeeForm.Value.JobTitle, e => {
-                            var updated = employeeForm.Value;
-                            updated.JobTitle = e.Value;
-                            employeeForm.Set(updated);
-                        }).Placeholder("Software Engineer"))
-                        .Add(Text.Small("Department"))
-                        .Add(new SelectInput<int>(departmentId.Value, e => {
-                            departmentId.Set(e.Value);
-                        }, departments.Select(d => $"{d.Id}:{d.Name}").ToOptions()))
-                        .Add(Text.Small("Salary ($)"))
-                        .Add(new NumberInput<decimal>(employeeForm.Value.Salary, v => {
-                            var updated = employeeForm.Value;
-                            updated.Salary = v;
-                            employeeForm.Set(updated);
-                        }).Placeholder("50000"))
-                        .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(employeeForm.Value.Status, e => {
-                            var updated = employeeForm.Value;
-                            updated.Status = e.Value;
-                            employeeForm.Set(updated);
-                        }, statusOptions.ToOptions()))
-                ).Title("Position"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Employment Dates"))
-                        .Add(Text.Small("Hire Date"))
-                        .Add(new DateTimeInput<DateTime>(employeeForm.Value.HireDate, e => {
-                            var updated = employeeForm.Value;
-                            updated.HireDate = e.Value;
-                            employeeForm.Set(updated);
-                        }))
-                        .Add(Text.Small("Termination Date (Optional)"))
-                        .Add(new DateTimeInput<DateTime>(employeeForm.Value.TerminationDate ?? DateTime.UtcNow, e => {
-                            var updated = employeeForm.Value;
-                            updated.TerminationDate = e.Value;
-                            employeeForm.Set(updated);
-                        }))
-                ).Title("Timeline"))
+                .Add(formView)
+                .Add(validationView)
         );
     }
 }
