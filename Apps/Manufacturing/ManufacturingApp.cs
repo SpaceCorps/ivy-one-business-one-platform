@@ -36,7 +36,6 @@ public class ManufacturingRootBlade : ViewBase
         var listItems = filteredWorkOrders.Select(wo => new ListItem(
             title: $"{wo.WorkOrderNumber} - {wo.ProductName}",
             subtitle: $"Qty: {wo.Quantity} - {wo.Progress}% complete",
-            icon: Icons.Settings,
             badge: wo.Status.ToString(),
             onClick: _ => { blades.Push(this, new WorkOrderDetailBlade(wo.Id), wo.WorkOrderNumber); return default; }
         ));
@@ -211,7 +210,6 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                 Layout.Horizontal()
                     .Gap(4)
                     .Wrap(true)
-                    // Start Production - тільки для Scheduled
                     .Add(workOrder.Status == WorkOrderStatus.Scheduled
                         ? new Button("Start Production", _ =>
                         {
@@ -226,10 +224,8 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             }
                             return default;
                         })
-                            .Icon(Icons.Play)
                             .Variant(ButtonVariant.Primary)
                         : null)
-                    // Update Progress - для Scheduled і In Production
                     .Add(workOrder.Status != WorkOrderStatus.Completed && workOrder.Status != WorkOrderStatus.Cancelled
                         ? new Button("Update Progress")
                             .Icon(Icons.TrendingUp)
@@ -241,7 +237,6 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                                 width: Size.Fraction(1 / 3f)
                             )
                         : null)
-                    // Complete - тільки для In Production
                     .Add(workOrder.Status == WorkOrderStatus.InProduction
                         ? new Button("Complete", _ =>
                         {
@@ -257,10 +252,8 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
                             }
                             return default;
                         })
-                            .Icon(Icons.Check)
-                            .Variant(ButtonVariant.Success)
+                            .Variant(ButtonVariant.Primary)
                         : null)
-                    // Cancel - для всіх крім Completed і Cancelled
                     .Add(workOrder.Status != WorkOrderStatus.Completed && workOrder.Status != WorkOrderStatus.Cancelled
                         ? new Button("Cancel Order", _ =>
                         {
