@@ -202,6 +202,24 @@ public class SignatureDetailBlade(int signatureId, Action? onRefresh = null) : V
 
 public class SignatureFormSheet(int? signatureId = null, Action? onClose = null) : ViewBase
 {
+    private Signature CloneSignature(Signature source) => new Signature
+    {
+        Id = source.Id,
+        DocumentTitle = source.DocumentTitle,
+        DocumentPath = source.DocumentPath,
+        SignerName = source.SignerName,
+        SignerEmail = source.SignerEmail,
+        Status = source.Status,
+        RequestDate = source.RequestDate,
+        SignedDate = source.SignedDate,
+        SignatureData = source.SignatureData,
+        IpAddress = source.IpAddress,
+        ExpiryDate = source.ExpiryDate,
+        Notes = source.Notes,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -303,15 +321,15 @@ public class SignatureFormSheet(int? signatureId = null, Action? onClose = null)
                         .Add(Text.Small("Document Information"))
                         .Add(Text.Small("Document Title"))
                         .Add(new TextInput(signatureForm.Value.DocumentTitle, e => {
-                            var updated = signatureForm.Value;
-                            updated.DocumentTitle = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.DocumentTitle = e.Value;
+                            signatureForm.Set(cloned);
                         }).Placeholder("Contract Agreement"))
                         .Add(Text.Small("Document Path"))
                         .Add(new TextInput(signatureForm.Value.DocumentPath, e => {
-                            var updated = signatureForm.Value;
-                            updated.DocumentPath = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.DocumentPath = e.Value;
+                            signatureForm.Set(cloned);
                         }).Placeholder("/documents/contract.pdf"))
                 ).Title("Document"))
                 
@@ -320,15 +338,15 @@ public class SignatureFormSheet(int? signatureId = null, Action? onClose = null)
                         .Add(Text.Small("Signer Information"))
                         .Add(Text.Small("Signer Name"))
                         .Add(new TextInput(signatureForm.Value.SignerName, e => {
-                            var updated = signatureForm.Value;
-                            updated.SignerName = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.SignerName = e.Value;
+                            signatureForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Signer Email"))
                         .Add(new TextInput(signatureForm.Value.SignerEmail, e => {
-                            var updated = signatureForm.Value;
-                            updated.SignerEmail = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.SignerEmail = e.Value;
+                            signatureForm.Set(cloned);
                         }).Placeholder("signer@example.com"))
                 ).Title("Signer"))
                 
@@ -337,21 +355,21 @@ public class SignatureFormSheet(int? signatureId = null, Action? onClose = null)
                         .Add(Text.Small("Request Settings"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(signatureForm.Value.Status, e => {
-                            var updated = signatureForm.Value;
-                            updated.Status = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.Status = e.Value;
+                            signatureForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                         .Add(Text.Small("Expiry Date (Optional)"))
                         .Add(new DateTimeInput<DateTime?>(signatureForm.Value.ExpiryDate, e => {
-                            var updated = signatureForm.Value;
-                            updated.ExpiryDate = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.ExpiryDate = e.Value;
+                            signatureForm.Set(cloned);
                         }))
                         .Add(Text.Small("Notes"))
                         .Add(new TextInput(signatureForm.Value.Notes, e => {
-                            var updated = signatureForm.Value;
-                            updated.Notes = e.Value;
-                            signatureForm.Set(updated);
+                            var cloned = CloneSignature(signatureForm.Value);
+                            cloned.Notes = e.Value;
+                            signatureForm.Set(cloned);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                 ).Title("Settings"))
         );
