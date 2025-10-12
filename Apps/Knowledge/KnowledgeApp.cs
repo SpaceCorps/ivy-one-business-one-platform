@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using IvyOneBusinessOnePlatform.Data;
 
 namespace IvyOneBusinessOnePlatform.Apps.Knowledge;
@@ -350,22 +351,17 @@ public class CategoryDetailBlade(int categoryId, Action? onRefresh = null) : Vie
     }
 }
 
+public record ArticleFormModel(
+    [Required] string Title,
+    [Required] string Content,
+    string Summary,
+    [Required] string CategoryId, // Changed to string to display names
+    ArticleStatus Status,
+    string Author
+);
+
 public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : ViewBase
 {
-    private Data.Article CloneArticle(Data.Article source) => new Data.Article
-    {
-        Id = source.Id,
-        Title = source.Title,
-        Content = source.Content,
-        Summary = source.Summary,
-        CategoryId = source.CategoryId,
-        Status = source.Status,
-        ViewCount = source.ViewCount,
-        Author = source.Author,
-        CreatedAt = source.CreatedAt,
-        UpdatedAt = source.UpdatedAt
-    };
-    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -373,133 +369,101 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
         
         var isEdit = articleId.HasValue;
         var existingArticle = isEdit ? context.Articles.FirstOrDefault(a => a.Id == articleId!.Value) : null;
-        
         var categories = context.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToList();
         
-        var articleForm = this.UseState(existingArticle ?? new Data.Article
-        {
-            Title = "",
-            Content = "",
-            Summary = "",
-            CategoryId = categories.FirstOrDefault()?.Id ?? 0,
-            Status = ArticleStatus.Draft,
-            ViewCount = 0,
-            Author = ""
-        });
+        var articleForm = this.UseState(() => existingArticle != null 
+            ? new ArticleFormModel(
+                existingArticle.Title,
+                existingArticle.Content,
+                existingArticle.Summary,
+                existingArticle.Category?.Name ?? "", // Convert int ID to string Name
+                existingArticle.Status,
+                existingArticle.Author
+            )
+            : new ArticleFormModel(
+                "",
+                "",
+                "",
+                categories.FirstOrDefault()?.Name ?? "", // Convert int ID to string Name
+                ArticleStatus.Draft,
+                ""
+            ));
         
-        var statusOptions = typeof(ArticleStatus).ToOptions();
+        var formBuilder = articleForm.ToForm()
+            .Group("Article Information", m => m.Title, m => m.Summary, m => m.Content)
+            .Group("Article Settings", m => m.CategoryId, m => m.Author, m => m.Status)
+            .Label(m => m.Title, "Title")
+            .Label(m => m.Summary, "Summary")
+            .Label(m => m.Content, "Content")
+            .Label(m => m.CategoryId, "Category")
+            .Label(m => m.Author, "Author")
+            .Label(m => m.Status, "Status")
+            .Builder(m => m.Summary, s => s.ToTextInput().Variant(TextInputs.Textarea).Placeholder("Brief summary..."))
+            .Builder(m => m.Content, s => s.ToTextInput().Variant(TextInputs.Textarea).Placeholder("Article content..."))
+            .Builder(m => m.CategoryId, s => s.ToSelectInput(categories.Select(c => c.Name).ToOptions()))
+            .Builder(m => m.Author, s => s.ToTextInput().Placeholder("Author Name"))
+            .Builder(m => m.Status, s => s.ToSelectInput(typeof(ArticleStatus).ToOptions()));
+        
+        var (onSubmit, formView, validationView, loading) = formBuilder.UseForm(this.Context);
+        
+        async ValueTask HandleSubmit()
+        {
+            if (await onSubmit())
+            {
+                try
+                {
+                    var formData = articleForm.Value;
+                    
+                    // Convert string CategoryId back to int
+                    var categoryId = categories.FirstOrDefault(c => c.Name == formData.CategoryId)?.Id ?? 1;
+                    
+                    if (isEdit && existingArticle != null)
+                    {
+                        existingArticle.Title = formData.Title;
+                        existingArticle.Content = formData.Content;
+                        existingArticle.Summary = formData.Summary;
+                        existingArticle.CategoryId = categoryId; // Convert string Name back to int ID
+                        existingArticle.Status = formData.Status;
+                        existingArticle.Author = formData.Author;
+                        existingArticle.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var newArticle = new Data.Article
+                        {
+                            Title = formData.Title,
+                            Content = formData.Content,
+                            Summary = formData.Summary,
+                            CategoryId = categoryId, // Convert string Name back to int ID
+                            Status = formData.Status,
+                            Author = formData.Author,
+                            ViewCount = 0,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.Articles.Add(newArticle);
+                    }
+                    
+                    await context.SaveChangesAsync();
+                    client.Toast(isEdit ? "Article updated successfully!" : "Article created successfully!");
+                    onClose?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    client.Toast($"Error: {ex.Message}", "Error");
+                }
+            }
+        }
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
                 .Add(new Button("Save")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            if (string.IsNullOrWhiteSpace(articleForm.Value.Title))
-                            {
-                                client.Toast("Title is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(articleForm.Value.Content))
-                            {
-                                client.Toast("Content is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (articleForm.Value.CategoryId == 0)
-                            {
-                                client.Toast("Category is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (isEdit && existingArticle != null)
-                            {
-                                existingArticle.Title = articleForm.Value.Title;
-                                existingArticle.Content = articleForm.Value.Content;
-                                existingArticle.Summary = articleForm.Value.Summary;
-                                existingArticle.CategoryId = articleForm.Value.CategoryId;
-                                existingArticle.Status = articleForm.Value.Status;
-                                existingArticle.Author = articleForm.Value.Author;
-                                existingArticle.UpdatedAt = DateTime.UtcNow;
-                            }
-                            else
-                            {
-                                var newArticle = new Data.Article
-                                {
-                                    Title = articleForm.Value.Title,
-                                    Content = articleForm.Value.Content,
-                                    Summary = articleForm.Value.Summary,
-                                    CategoryId = articleForm.Value.CategoryId,
-                                    Status = articleForm.Value.Status,
-                                    Author = articleForm.Value.Author,
-                                    ViewCount = 0,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-                                context.Articles.Add(newArticle);
-                            }
-                            
-                            context.SaveChanges();
-                            client.Toast(isEdit ? "Article updated successfully!" : "Article created successfully!");
-                            onClose?.Invoke();
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error: {ex.Message}", "Error");
-                        }
-                    }))
+                    .HandleClick(_ => HandleSubmit()))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
                     .HandleClick(_ => onClose?.Invoke())),
-            
-            Layout.Vertical().Gap(4)
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Article Information"))
-                        .Add(Text.Small("Title"))
-                        .Add(new TextInput(articleForm.Value.Title, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.Title = e.Value;
-                            articleForm.Set(cloned);
-                        }).Placeholder("Article Title"))
-                        .Add(Text.Small("Summary"))
-                        .Add(new TextInput(articleForm.Value.Summary, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.Summary = e.Value;
-                            articleForm.Set(cloned);
-                        }).Placeholder("Brief summary...").Variant(TextInputs.Textarea))
-                        .Add(Text.Small("Content"))
-                        .Add(new TextInput(articleForm.Value.Content, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.Content = e.Value;
-                            articleForm.Set(cloned);
-                        }).Placeholder("Article content...").Variant(TextInputs.Textarea))
-                ).Title("Article Details"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Article Settings"))
-                        .Add(Text.Small("Category"))
-                        .Add(new SelectInput<int>(articleForm.Value.CategoryId, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.CategoryId = e.Value;
-                            articleForm.Set(cloned);
-                        }, categories.Select(c => (c.Id, c.Name)).ToOptions()))
-                        .Add(Text.Small("Author"))
-                        .Add(new TextInput(articleForm.Value.Author, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.Author = e.Value;
-                            articleForm.Set(cloned);
-                        }).Placeholder("Author Name"))
-                        .Add(Text.Small("Status"))
-                        .Add(new SelectInput<ArticleStatus>(articleForm.Value.Status, e => {
-                            var cloned = CloneArticle(articleForm.Value);
-                            cloned.Status = e.Value;
-                            articleForm.Set(cloned);
-                        }, statusOptions))
-                ).Title("Settings"))
+            formView
         );
     }
 }
