@@ -197,6 +197,21 @@ public class CampaignDetailBlade(int campaignId, Action? onRefresh = null) : Vie
 
 public class CampaignFormSheet(string campaignType, int? campaignId = null, Action? onClose = null) : ViewBase
 {
+    private Campaign CloneCampaign(Campaign source) => new Campaign
+    {
+        Id = source.Id,
+        Name = source.Name,
+        Description = source.Description,
+        Type = source.Type,
+        Status = source.Status,
+        StartDate = source.StartDate,
+        EndDate = source.EndDate,
+        Budget = source.Budget,
+        TargetAudience = source.TargetAudience,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -286,27 +301,27 @@ public class CampaignFormSheet(string campaignType, int? campaignId = null, Acti
                         .Add(Text.Small("Campaign Information"))
                         .Add(Text.Small("Campaign Name"))
                         .Add(new TextInput(campaignForm.Value.Name, e => {
-                            var updated = campaignForm.Value;
-                            updated.Name = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.Name = e.Value;
+                            campaignForm.Set(cloned);
                         }).Placeholder("Summer Sale 2025"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(campaignForm.Value.Description, e => {
-                            var updated = campaignForm.Value;
-                            updated.Description = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.Description = e.Value;
+                            campaignForm.Set(cloned);
                         }).Placeholder("Campaign description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Target Audience"))
                         .Add(new TextInput(campaignForm.Value.TargetAudience, e => {
-                            var updated = campaignForm.Value;
-                            updated.TargetAudience = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.TargetAudience = e.Value;
+                            campaignForm.Set(cloned);
                         }).Placeholder("All subscribers"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(campaignForm.Value.Status, e => {
-                            var updated = campaignForm.Value;
-                            updated.Status = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.Status = e.Value;
+                            campaignForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Campaign Details"))
                 
@@ -315,21 +330,21 @@ public class CampaignFormSheet(string campaignType, int? campaignId = null, Acti
                         .Add(Text.Small("Timeline & Budget"))
                         .Add(Text.Small("Start Date"))
                         .Add(new DateTimeInput<DateTime>(campaignForm.Value.StartDate, e => {
-                            var updated = campaignForm.Value;
-                            updated.StartDate = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.StartDate = e.Value;
+                            campaignForm.Set(cloned);
                         }))
                         .Add(Text.Small("End Date (Optional)"))
                         .Add(new DateTimeInput<DateTime?>(campaignForm.Value.EndDate, e => {
-                            var updated = campaignForm.Value;
-                            updated.EndDate = e.Value;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.EndDate = e.Value;
+                            campaignForm.Set(cloned);
                         }))
                         .Add(Text.Small("Budget ($)"))
                         .Add(new NumberInput<decimal>(campaignForm.Value.Budget, v => {
-                            var updated = campaignForm.Value;
-                            updated.Budget = v;
-                            campaignForm.Set(updated);
+                            var cloned = CloneCampaign(campaignForm.Value);
+                            cloned.Budget = v;
+                            campaignForm.Set(cloned);
                         }).Placeholder("0.00"))
                 ).Title("Schedule"))
         );
