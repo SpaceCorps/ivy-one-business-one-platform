@@ -97,6 +97,9 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
             }
         }, [refreshToken.ToTrigger()]);
         
+        // Helper function to get current subscription from database
+        Subscription? GetCurrentSubscription() => context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+        
         var statusBadge = new Badge(subscriptionData.Value.Status)
             .Variant(subscriptionData.Value.Status == "Active" ? BadgeVariant.Success :
                    subscriptionData.Value.Status == "Cancelled" ? BadgeVariant.Destructive :
@@ -123,7 +126,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
             .Add(Layout.Horizontal()
                 .Gap(4)
                 .Add(subscriptionData.Value.Status == "Active" ? new Button("Cancel Subscription", _ => {
-                    var dbSubscription = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+                    var dbSubscription = GetCurrentSubscription();
                     if (dbSubscription != null)
                     {
                         dbSubscription.Status = "Cancelled";
@@ -139,7 +142,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                     .Icon(Icons.X)
                     : null)
                 .Add(subscriptionData.Value.Status == "Paused" ? new Button("Reactivate", _ => {
-                    var dbSubscription = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+                    var dbSubscription = GetCurrentSubscription();
                     if (dbSubscription != null)
                     {
                         dbSubscription.Status = "Active";
@@ -168,7 +171,7 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
                                 {
                                     try
                                     {
-                                        var subscriptionToDelete = context.Subscriptions.FirstOrDefault(s => s.Id == subscriptionId);
+                                        var subscriptionToDelete = GetCurrentSubscription();
                                         if (subscriptionToDelete != null)
                                         {
                                             context.Subscriptions.Remove(subscriptionToDelete);
