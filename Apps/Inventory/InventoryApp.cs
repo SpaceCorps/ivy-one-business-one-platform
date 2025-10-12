@@ -121,6 +121,9 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                 productData.Value.QuantityInStock == 0 ? BadgeVariant.Destructive :
                 productData.Value.QuantityInStock < productData.Value.MinimumStockLevel ? BadgeVariant.Warning : BadgeVariant.Success);
 
+        var isActiveBadge = new Badge(productData.Value.IsActive ? "Active" : "Inactive")
+            .Variant(productData.Value.IsActive ? BadgeVariant.Success : BadgeVariant.Secondary);
+
         var productDetails = new
         {
             ProductCode = productData.Value.ProductCode,
@@ -133,7 +136,7 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
             QuantityInStock = productData.Value.QuantityInStock.ToString(),
             MinimumStockLevel = productData.Value.MinimumStockLevel.ToString(),
             StockStatus = stockBadge,
-            IsActive = productData.Value.IsActive ? "Active" : "Inactive"
+            IsActive = isActiveBadge
         };
         
         return Layout.Vertical()
