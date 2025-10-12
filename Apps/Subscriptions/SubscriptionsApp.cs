@@ -20,7 +20,6 @@ public class SubscriptionsRootBlade : ViewBase
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
-        var isNewSubscriptionOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
         var query = context.Subscriptions.AsQueryable();
@@ -45,28 +44,23 @@ public class SubscriptionsRootBlade : ViewBase
             onClick: _ => blades.Push(this, new SubscriptionDetailBlade(sub.Id, () => refreshToken.Refresh()), sub.CustomerName)
         ));
         
-        var mainContent = BladeHelper.WithHeader(
+        return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(4)
+                .Gap(8)
                 .Add(searchQuery.ToSearchInput().Placeholder("Search by customer, email, plan, or status..."))
                 .Add(new Button("New Subscription")
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => isNewSubscriptionOpen.Set(true))),
+                    .WithSheet(
+                        () => new SubscriptionFormSheet(null, () => refreshToken.Refresh()),
+                        title: "New Subscription",
+                        description: "Create a new subscription",
+                        width: Size.Fraction(1/3f)
+                    )),
             subscriptions.Count == 0 
                 ? Text.Block("No subscriptions found. Try a different search or create your first subscription!")
                 : new List(listItems)
         );
-
-        return isNewSubscriptionOpen.Value ? new Sheet(
-            (Event<Sheet> _) => isNewSubscriptionOpen.Set(false),
-            new SubscriptionFormSheet(null, () => {
-                isNewSubscriptionOpen.Set(false);
-                refreshToken.Refresh();
-            }),
-            title: "New Subscription",
-            description: "Create a new subscription"
-        ).Width(Size.Fraction(1/3f)) : mainContent;
     }
 }
 
@@ -212,23 +206,6 @@ public class SubscriptionDetailBlade(int subscriptionId, Action? onRefresh = nul
 
 public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose = null) : ViewBase
 {
-    private Subscription CloneSubscription(Subscription source) => new Subscription
-    {
-        Id = source.Id,
-        CustomerName = source.CustomerName,
-        CustomerEmail = source.CustomerEmail,
-        PlanName = source.PlanName,
-        MonthlyAmount = source.MonthlyAmount,
-        BillingCycle = source.BillingCycle,
-        Status = source.Status,
-        StartDate = source.StartDate,
-        EndDate = source.EndDate,
-        NextBillingDate = source.NextBillingDate,
-        PaymentMethod = source.PaymentMethod,
-        CreatedAt = source.CreatedAt,
-        UpdatedAt = source.UpdatedAt
-    };
-    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -253,151 +230,102 @@ public class SubscriptionFormSheet(int? subscriptionId = null, Action? onClose =
         var statusOptions = new[] { "Active", "Cancelled", "Paused", "Expired" };
         var billingCycleOptions = new[] { "Monthly", "Quarterly", "Yearly" };
         
+        var formBuilder = subscriptionForm.ToForm(isEdit ? "Save Changes" : "Create Subscription")
+            .Label(m => m.CustomerName, "Customer Name")
+            .Label(m => m.CustomerEmail, "Customer Email")
+            .Label(m => m.PlanName, "Plan Name")
+            .Label(m => m.MonthlyAmount, "Monthly Amount ($)")
+            .Label(m => m.BillingCycle, "Billing Cycle")
+            .Builder(m => m.BillingCycle, s => s.ToSelectInput(billingCycleOptions.ToOptions()))
+            .Label(m => m.PaymentMethod, "Payment Method")
+            .Label(m => m.StartDate, "Start Date")
+            .Builder(m => m.StartDate, s => s.ToDateTimeInput())
+            .Label(m => m.NextBillingDate, "Next Billing Date")
+            .Builder(m => m.NextBillingDate, s => s.ToDateTimeInput())
+            .Label(m => m.Status, "Status")
+            .Builder(m => m.Status, s => s.ToSelectInput(statusOptions.ToOptions()))
+            .Remove(m => m.Id)
+            .Remove(m => m.EndDate)
+            .Remove(m => m.CreatedAt)
+            .Remove(m => m.UpdatedAt)
+            .Required(m => m.CustomerName, m => m.CustomerEmail, m => m.PlanName)
+            .Validate<string>(m => m.CustomerName, name =>
+                (name.Length >= 2, "Customer name must be at least 2 characters"))
+            .Validate<string>(m => m.CustomerEmail, email =>
+                (email.Contains("@") && email.Contains("."), "Please enter a valid email address"))
+            .Validate<string>(m => m.PlanName, plan =>
+                (plan.Length >= 3, "Plan name must be at least 3 characters"))
+            .Validate<decimal>(m => m.MonthlyAmount, amount =>
+                (amount >= 0, "Monthly amount cannot be negative"))
+            .Validate<DateTime>(m => m.StartDate, startDate =>
+                (startDate <= DateTime.UtcNow.AddYears(1), "Start date cannot be more than 1 year in the future"))
+            .Validate<DateTime?>(m => m.NextBillingDate, nextBilling =>
+                (nextBilling == null || nextBilling >= DateTime.UtcNow.AddDays(-1), "Next billing date cannot be in the past"));
+        
+        var (onSubmit, formView, validationView, loading) = formBuilder.UseForm(this.Context);
+        
+        async ValueTask HandleSubmit()
+        {
+            if (await onSubmit())
+            {
+                try
+                {
+                    if (isEdit && existingSubscription != null)
+                    {
+                        existingSubscription.CustomerName = subscriptionForm.Value.CustomerName;
+                        existingSubscription.CustomerEmail = subscriptionForm.Value.CustomerEmail;
+                        existingSubscription.PlanName = subscriptionForm.Value.PlanName;
+                        existingSubscription.MonthlyAmount = subscriptionForm.Value.MonthlyAmount;
+                        existingSubscription.BillingCycle = subscriptionForm.Value.BillingCycle;
+                        existingSubscription.Status = subscriptionForm.Value.Status;
+                        existingSubscription.StartDate = subscriptionForm.Value.StartDate;
+                        existingSubscription.NextBillingDate = subscriptionForm.Value.NextBillingDate;
+                        existingSubscription.PaymentMethod = subscriptionForm.Value.PaymentMethod;
+                        existingSubscription.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var newSubscription = new Subscription
+                        {
+                            CustomerName = subscriptionForm.Value.CustomerName,
+                            CustomerEmail = subscriptionForm.Value.CustomerEmail,
+                            PlanName = subscriptionForm.Value.PlanName,
+                            MonthlyAmount = subscriptionForm.Value.MonthlyAmount,
+                            BillingCycle = subscriptionForm.Value.BillingCycle,
+                            Status = subscriptionForm.Value.Status,
+                            StartDate = subscriptionForm.Value.StartDate,
+                            NextBillingDate = subscriptionForm.Value.NextBillingDate,
+                            PaymentMethod = subscriptionForm.Value.PaymentMethod,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.Subscriptions.Add(newSubscription);
+                    }
+                    
+                    context.SaveChanges();
+                    client.Toast(isEdit ? "Subscription updated successfully!" : "Subscription created successfully!");
+                    onClose?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    client.Toast($"Error: {ex.Message}", "Error");
+                }
+            }
+        }
+        
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
-                .Add(new Button("Save")
+                .Add(new Button(isEdit ? "Save Changes" : "Create Subscription")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            if (string.IsNullOrWhiteSpace(subscriptionForm.Value.CustomerName))
-                            {
-                                client.Toast("Customer Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(subscriptionForm.Value.CustomerEmail))
-                            {
-                                client.Toast("Customer Email is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(subscriptionForm.Value.PlanName))
-                            {
-                                client.Toast("Plan Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (subscriptionForm.Value.MonthlyAmount < 0)
-                            {
-                                client.Toast("Monthly Amount cannot be negative", "Validation Error");
-                                return;
-                            }
-                            
-                            if (isEdit && existingSubscription != null)
-                            {
-                                existingSubscription.CustomerName = subscriptionForm.Value.CustomerName;
-                                existingSubscription.CustomerEmail = subscriptionForm.Value.CustomerEmail;
-                                existingSubscription.PlanName = subscriptionForm.Value.PlanName;
-                                existingSubscription.MonthlyAmount = subscriptionForm.Value.MonthlyAmount;
-                                existingSubscription.BillingCycle = subscriptionForm.Value.BillingCycle;
-                                existingSubscription.Status = subscriptionForm.Value.Status;
-                                existingSubscription.StartDate = subscriptionForm.Value.StartDate;
-                                existingSubscription.NextBillingDate = subscriptionForm.Value.NextBillingDate;
-                                existingSubscription.PaymentMethod = subscriptionForm.Value.PaymentMethod;
-                                existingSubscription.UpdatedAt = DateTime.UtcNow;
-                            }
-                            else
-                            {
-                                var newSubscription = new Subscription
-                                {
-                                    CustomerName = subscriptionForm.Value.CustomerName,
-                                    CustomerEmail = subscriptionForm.Value.CustomerEmail,
-                                    PlanName = subscriptionForm.Value.PlanName,
-                                    MonthlyAmount = subscriptionForm.Value.MonthlyAmount,
-                                    BillingCycle = subscriptionForm.Value.BillingCycle,
-                                    Status = subscriptionForm.Value.Status,
-                                    StartDate = subscriptionForm.Value.StartDate,
-                                    NextBillingDate = subscriptionForm.Value.NextBillingDate,
-                                    PaymentMethod = subscriptionForm.Value.PaymentMethod,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-                                context.Subscriptions.Add(newSubscription);
-                            }
-                            
-                            context.SaveChanges();
-                            client.Toast(isEdit ? "Subscription updated successfully!" : "Subscription created successfully!");
-                            onClose?.Invoke();
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error: {ex.Message}", "Error");
-                        }
-                    }))
+                    .Loading(loading)
+                    .Disabled(loading)
+                    .HandleClick(_ => HandleSubmit()))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
-                    .HandleClick(_ => onClose?.Invoke())),
-            
-            Layout.Vertical().Gap(4)
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Customer Information"))
-                        .Add(Text.Small("Customer Name"))
-                        .Add(new TextInput(subscriptionForm.Value.CustomerName, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.CustomerName = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }).Placeholder("John Doe"))
-                        .Add(Text.Small("Customer Email"))
-                        .Add(new TextInput(subscriptionForm.Value.CustomerEmail, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.CustomerEmail = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }).Placeholder("customer@example.com"))
-                ).Title("Customer"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Plan Information"))
-                        .Add(Text.Small("Plan Name"))
-                        .Add(new TextInput(subscriptionForm.Value.PlanName, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.PlanName = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }).Placeholder("Premium Plan"))
-                        .Add(Text.Small("Monthly Amount ($)"))
-                        .Add(new NumberInput<decimal>(subscriptionForm.Value.MonthlyAmount, v => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.MonthlyAmount = v;
-                            subscriptionForm.Set(cloned);
-                        }).Placeholder("0.00"))
-                        .Add(Text.Small("Billing Cycle"))
-                        .Add(new SelectInput<string>(subscriptionForm.Value.BillingCycle, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.BillingCycle = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }, billingCycleOptions.ToOptions()))
-                        .Add(Text.Small("Payment Method"))
-                        .Add(new TextInput(subscriptionForm.Value.PaymentMethod, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.PaymentMethod = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }).Placeholder("Credit Card"))
-                ).Title("Plan Details"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Subscription Timeline"))
-                        .Add(Text.Small("Start Date"))
-                        .Add(new DateTimeInput<DateTime>(subscriptionForm.Value.StartDate, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.StartDate = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }))
-                        .Add(Text.Small("Next Billing Date"))
-                        .Add(new DateTimeInput<DateTime?>(subscriptionForm.Value.NextBillingDate, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.NextBillingDate = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }))
-                        .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(subscriptionForm.Value.Status, e => {
-                            var cloned = CloneSubscription(subscriptionForm.Value);
-                            cloned.Status = e.Value;
-                            subscriptionForm.Set(cloned);
-                        }, statusOptions.ToOptions()))
-                ).Title("Timeline"))
+                    .Disabled(loading)
+                    .HandleClick(_ => onClose?.Invoke()))
+                .Add(validationView),
+            formView
         );
     }
 }
