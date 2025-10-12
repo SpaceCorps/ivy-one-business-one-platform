@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IvyOneBusinessOnePlatform.Data;
 
+public enum ArticleStatus
+{
+    Draft,
+    Published,
+    Archived
+}
+
 public class Article
 {
     public int Id { get; set; }
@@ -19,9 +26,7 @@ public class Article
     [Required]
     public int CategoryId { get; set; }
     
-    [Required]
-    [MaxLength(50)]
-    public string Status { get; set; } = "Draft"; // Draft, Published, Archived
+    public ArticleStatus Status { get; set; } = ArticleStatus.Draft;
     
     [Range(0, int.MaxValue, ErrorMessage = "View count cannot be negative")]
     public int ViewCount { get; set; }

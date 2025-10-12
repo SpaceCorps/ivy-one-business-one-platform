@@ -23,7 +23,7 @@ public class KnowledgeRootBlade : ViewBase
         var isNewArticleOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
-        var query = context.Articles.Include(a => a.Category).Where(a => a.Status == "Published").AsQueryable();
+        var query = context.Articles.Include(a => a.Category).Where(a => a.Status == ArticleStatus.Published).AsQueryable();
 
         if (!string.IsNullOrEmpty(searchQuery.Value))
         {
@@ -41,7 +41,7 @@ public class KnowledgeRootBlade : ViewBase
             title: article.Title,
             subtitle: $"{article.Category?.Name ?? "Uncategorized"} - {article.ViewCount} views - By {article.Author}",
             icon: Icons.FileText,
-            badge: article.Status,
+            badge: article.Status.ToString(),
             onClick: _ => blades.Push(this, new ArticleDetailBlade(article.Id, () => refreshToken.Refresh()), article.Title)
         ));
         
@@ -98,22 +98,20 @@ public class ArticleDetailBlade(int articleId, Action? onRefresh = null) : ViewB
         
         this.UseEffect(() =>
         {
+            // Atomically increment view count
+            context.Database.ExecuteSqlRaw("UPDATE Articles SET ViewCount = ViewCount + 1 WHERE Id = {0}", articleId);
+            
+            // Fetch updated article with category
             var updatedArticle = context.Articles.Include(a => a.Category).FirstOrDefault(a => a.Id == articleId);
             if (updatedArticle != null)
             {
-                // Increment view count if not already incremented
-                if (updatedArticle.ViewCount == articleData.Value?.ViewCount)
-                {
-                    updatedArticle.ViewCount++;
-                    context.SaveChanges();
-                }
                 articleData.Set(updatedArticle);
             }
         }, [refreshToken.ToTrigger()]);
         
-        var statusBadge = new Badge(articleData.Value.Status)
-            .Variant(articleData.Value.Status == "Published" ? BadgeVariant.Success :
-                   articleData.Value.Status == "Archived" ? BadgeVariant.Secondary :
+        var statusBadge = new Badge(articleData.Value.Status.ToString())
+            .Variant(articleData.Value.Status == ArticleStatus.Published ? BadgeVariant.Success :
+                   articleData.Value.Status == ArticleStatus.Archived ? BadgeVariant.Secondary :
                    BadgeVariant.Warning);
 
         var articleDetails = new
@@ -134,11 +132,11 @@ public class ArticleDetailBlade(int articleId, Action? onRefresh = null) : ViewB
             .Add(articleDetails.ToDetails().RemoveEmpty().MultiLine(x => x.Content).MultiLine(x => x.Summary))
             .Add(Layout.Horizontal()
                 .Gap(4)
-                .Add(articleData.Value.Status == "Draft" ? new Button("Publish Article", _ => {
+                .Add(articleData.Value.Status == ArticleStatus.Draft ? new Button("Publish Article", _ => {
                     var dbArticle = context.Articles.FirstOrDefault(a => a.Id == articleId);
                     if (dbArticle != null)
                     {
-                        dbArticle.Status = "Published";
+                        dbArticle.Status = ArticleStatus.Published;
                         dbArticle.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Article {articleData.Value.Title} published!");
@@ -149,11 +147,11 @@ public class ArticleDetailBlade(int articleId, Action? onRefresh = null) : ViewB
                     .Variant(ButtonVariant.Success)
                     .Icon(Icons.Check)
                     : null)
-                .Add(articleData.Value.Status == "Published" ? new Button("Archive Article", _ => {
+                .Add(articleData.Value.Status == ArticleStatus.Published ? new Button("Archive Article", _ => {
                     var dbArticle = context.Articles.FirstOrDefault(a => a.Id == articleId);
                     if (dbArticle != null)
                     {
-                        dbArticle.Status = "Archived";
+                        dbArticle.Status = ArticleStatus.Archived;
                         dbArticle.UpdatedAt = DateTime.UtcNow;
                         context.SaveChanges();
                         client.Toast($"Article {articleData.Value.Title} archived!");
@@ -297,7 +295,7 @@ public class CategoryDetailBlade(int categoryId, Action? onRefresh = null) : Vie
             title: article.Title,
             subtitle: $"{article.ViewCount} views - By {article.Author}",
             icon: Icons.FileText,
-            badge: article.Status,
+            badge: article.Status.ToString(),
             onClick: _ => blades.Push(this, new ArticleDetailBlade(article.Id, () => refreshToken.Refresh()), article.Title)
         ));
         
@@ -384,12 +382,12 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
             Content = "",
             Summary = "",
             CategoryId = categories.FirstOrDefault()?.Id ?? 0,
-            Status = "Draft",
+            Status = ArticleStatus.Draft,
             ViewCount = 0,
             Author = ""
         });
         
-        var statusOptions = new[] { "Draft", "Published", "Archived" };
+        var statusOptions = typeof(ArticleStatus).ToOptions();
         
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
@@ -496,11 +494,11 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
                             articleForm.Set(cloned);
                         }).Placeholder("Author Name"))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(articleForm.Value.Status, e => {
+                        .Add(new SelectInput<ArticleStatus>(articleForm.Value.Status, e => {
                             var cloned = CloneArticle(articleForm.Value);
                             cloned.Status = e.Value;
                             articleForm.Set(cloned);
-                        }, statusOptions.ToOptions()))
+                        }, statusOptions))
                 ).Title("Settings"))
         );
     }
