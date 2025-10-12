@@ -308,6 +308,20 @@ public class TaskDetailBlade(int taskId, Action? onRefresh = null) : ViewBase
 
 public class ProjectFormSheet(int? projectId = null, Action? onClose = null) : ViewBase
 {
+    private Data.Project CloneProject(Data.Project source) => new Data.Project
+    {
+        Id = source.Id,
+        Name = source.Name,
+        Description = source.Description,
+        Status = source.Status,
+        StartDate = source.StartDate,
+        EndDate = source.EndDate,
+        Budget = source.Budget,
+        ProjectManager = source.ProjectManager,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -395,27 +409,27 @@ public class ProjectFormSheet(int? projectId = null, Action? onClose = null) : V
                         .Add(Text.Small("Project Information"))
                         .Add(Text.Small("Project Name"))
                         .Add(new TextInput(projectForm.Value.Name, e => {
-                            var updated = projectForm.Value;
-                            updated.Name = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.Name = e.Value;
+                            projectForm.Set(cloned);
                         }).Placeholder("Project Name"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(projectForm.Value.Description, e => {
-                            var updated = projectForm.Value;
-                            updated.Description = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.Description = e.Value;
+                            projectForm.Set(cloned);
                         }).Placeholder("Project description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Project Manager"))
                         .Add(new TextInput(projectForm.Value.ProjectManager, e => {
-                            var updated = projectForm.Value;
-                            updated.ProjectManager = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.ProjectManager = e.Value;
+                            projectForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(projectForm.Value.Status, e => {
-                            var updated = projectForm.Value;
-                            updated.Status = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.Status = e.Value;
+                            projectForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Project Details"))
                 
@@ -424,21 +438,21 @@ public class ProjectFormSheet(int? projectId = null, Action? onClose = null) : V
                         .Add(Text.Small("Timeline & Budget"))
                         .Add(Text.Small("Start Date"))
                         .Add(new DateTimeInput<DateTime>(projectForm.Value.StartDate, e => {
-                            var updated = projectForm.Value;
-                            updated.StartDate = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.StartDate = e.Value;
+                            projectForm.Set(cloned);
                         }))
                         .Add(Text.Small("End Date (Optional)"))
                         .Add(new DateTimeInput<DateTime?>(projectForm.Value.EndDate, e => {
-                            var updated = projectForm.Value;
-                            updated.EndDate = e.Value;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.EndDate = e.Value;
+                            projectForm.Set(cloned);
                         }))
                         .Add(Text.Small("Budget ($)"))
                         .Add(new NumberInput<decimal>(projectForm.Value.Budget, v => {
-                            var updated = projectForm.Value;
-                            updated.Budget = v;
-                            projectForm.Set(updated);
+                            var cloned = CloneProject(projectForm.Value);
+                            cloned.Budget = v;
+                            projectForm.Set(cloned);
                         }).Placeholder("0.00"))
                 ).Title("Schedule"))
         );
@@ -447,6 +461,20 @@ public class ProjectFormSheet(int? projectId = null, Action? onClose = null) : V
 
 public class TaskFormSheet(int projectId, int? taskId = null, Action? onClose = null) : ViewBase
 {
+    private Data.Task CloneTask(Data.Task source) => new Data.Task
+    {
+        Id = source.Id,
+        ProjectId = source.ProjectId,
+        Name = source.Name,
+        Description = source.Description,
+        Status = source.Status,
+        Priority = source.Priority,
+        DueDate = source.DueDate,
+        Assignee = source.Assignee,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -534,39 +562,39 @@ public class TaskFormSheet(int projectId, int? taskId = null, Action? onClose = 
                         .Add(Text.Small("Task Information"))
                         .Add(Text.Small("Task Name"))
                         .Add(new TextInput(taskForm.Value.Name, e => {
-                            var updated = taskForm.Value;
-                            updated.Name = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.Name = e.Value;
+                            taskForm.Set(cloned);
                         }).Placeholder("Task Name"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(taskForm.Value.Description, e => {
-                            var updated = taskForm.Value;
-                            updated.Description = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.Description = e.Value;
+                            taskForm.Set(cloned);
                         }).Placeholder("Task description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Assignee"))
                         .Add(new TextInput(taskForm.Value.Assignee, e => {
-                            var updated = taskForm.Value;
-                            updated.Assignee = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.Assignee = e.Value;
+                            taskForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(taskForm.Value.Status, e => {
-                            var updated = taskForm.Value;
-                            updated.Status = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.Status = e.Value;
+                            taskForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                         .Add(Text.Small("Priority"))
                         .Add(new SelectInput<int>(taskForm.Value.Priority, e => {
-                            var updated = taskForm.Value;
-                            updated.Priority = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.Priority = e.Value;
+                            taskForm.Set(cloned);
                         }, priorityOptions.ToOptions()))
                         .Add(Text.Small("Due Date (Optional)"))
                         .Add(new DateTimeInput<DateTime?>(taskForm.Value.DueDate, e => {
-                            var updated = taskForm.Value;
-                            updated.DueDate = e.Value;
-                            taskForm.Set(updated);
+                            var cloned = CloneTask(taskForm.Value);
+                            cloned.DueDate = e.Value;
+                            taskForm.Set(cloned);
                         }))
                 ).Title("Task Details"))
         );
