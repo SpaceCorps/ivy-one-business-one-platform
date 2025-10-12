@@ -28,7 +28,6 @@ public class InventoryRootBlade : ViewBase
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         var searchQuery = this.UseState("");
-        var isNewProductOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
         var query = context.Products.AsQueryable();
@@ -53,28 +52,23 @@ public class InventoryRootBlade : ViewBase
             onClick: _ => { blades.Push(this, new ProductDetailBlade(prod.Id, () => refreshToken.Refresh()), prod.Name); return default; }
         ));
         
-        var mainContent = BladeHelper.WithHeader(
+        return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(4)
+                .Gap(8)
                 .Add(searchQuery.ToSearchInput().Placeholder("Search by code, name, category, or supplier..."))
                 .Add(new Button("Add Product")
                     .Icon(Icons.Plus)
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => isNewProductOpen.Set(true))),
+                    .WithSheet(
+                        () => new ProductFormSheet(null, () => refreshToken.Refresh()),
+                        title: "New Product",
+                        description: "Add a new product to inventory",
+                        width: Size.Fraction(1/3f)
+                    )),
             products.Count == 0 
                 ? Text.Block("No products yet. Try a different search or add your first product!")
                 : new List(listItems)
         );
-
-        return isNewProductOpen.Value ? new Sheet(
-            (Event<Sheet> _) => isNewProductOpen.Set(false),
-            new ProductFormSheet(null, () => {
-                isNewProductOpen.Set(false);
-                refreshToken.Refresh();
-            }),
-            title: "New Product",
-            description: "Add a new product to inventory"
-        ).Width(Size.Fraction(1/3f)) : mainContent;
     }
 }
 
@@ -98,8 +92,6 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
         }
         
         var productData = this.UseState(initialProduct);
-        var isEditOpen = this.UseState(false);
-        var isStockAdjustOpen = this.UseState(false);
         var refreshToken = this.UseRefreshToken();
         
         this.UseEffect(() =>
@@ -138,11 +130,27 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                 .Add(new Button("Adjust Stock")
                     .Variant(ButtonVariant.Primary)
                     .Icon(Icons.Package)
-                    .HandleClick(_ => isStockAdjustOpen.Set(true)))
+                    .WithSheet(
+                        () => new StockAdjustmentSheet(productId, () => {
+                            refreshToken.Refresh();
+                            onRefresh?.Invoke();
+                        }),
+                        title: "Adjust Stock",
+                        description: $"Adjust stock for {productData.Value.Name}",
+                        width: Size.Fraction(1/3f)
+                    ))
                 .Add(new Button("Edit Product")
                     .Variant(ButtonVariant.Outline)
                     .Icon(Icons.Pencil)
-                    .HandleClick(_ => isEditOpen.Set(true)))
+                    .WithSheet(
+                        () => new ProductFormSheet(productId, () => {
+                            refreshToken.Refresh();
+                            onRefresh?.Invoke();
+                        }),
+                        title: "Edit Product",
+                        description: $"Edit product {productData.Value.Name}",
+                        width: Size.Fraction(1/3f)
+                    ))
                 .Add(new Button("Delete Product")
                     .Variant(ButtonVariant.Destructive)
                     .Icon(Icons.Trash)
@@ -166,49 +174,12 @@ public class ProductDetailBlade(int productId, Action? onRefresh = null) : ViewB
                         }
                     }))
                 .Add(new Button("Cancel", _ => blades.Pop())
-                    .Variant(ButtonVariant.Secondary)))
-            .Add(isEditOpen.Value ? new Sheet(
-                (Event<Sheet> _) => isEditOpen.Set(false),
-                new ProductFormSheet(productId, () => {
-                    isEditOpen.Set(false);
-                    refreshToken.Refresh();
-                    onRefresh?.Invoke();
-                }),
-                title: "Edit Product",
-                description: $"Edit product {productData.Value.Name}"
-            ).Width(Size.Fraction(1/3f)) : null)
-            .Add(isStockAdjustOpen.Value ? new Sheet(
-                (Event<Sheet> _) => isStockAdjustOpen.Set(false),
-                new StockAdjustmentSheet(productId, () => {
-                    isStockAdjustOpen.Set(false);
-                    refreshToken.Refresh();
-                    onRefresh?.Invoke();
-                }),
-                title: "Adjust Stock",
-                description: $"Adjust stock for {productData.Value.Name}"
-            ).Width(Size.Fraction(1/3f)) : null);
+                    .Variant(ButtonVariant.Secondary)));
     }
 }
 
 public class ProductFormSheet(int? productId = null, Action? onClose = null) : ViewBase
 {
-    private Product CloneProduct(Product source) => new Product
-    {
-        Id = source.Id,
-        ProductCode = source.ProductCode,
-        Name = source.Name,
-        Description = source.Description,
-        Price = source.Price,
-        Cost = source.Cost,
-        QuantityInStock = source.QuantityInStock,
-        MinimumStockLevel = source.MinimumStockLevel,
-        Category = source.Category,
-        Supplier = source.Supplier,
-        IsActive = source.IsActive,
-        CreatedAt = source.CreatedAt,
-        UpdatedAt = source.UpdatedAt
-    };
-    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -219,7 +190,7 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
         
         var productForm = this.UseState(existingProduct ?? new Product
         {
-            ProductCode = "",
+            ProductCode = isEdit ? "" : $"PROD-{DateTime.UtcNow:yyyyMMddHHmmss}",
             Name = "",
             Description = "",
             Price = 0.00m,
@@ -231,181 +202,109 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
             IsActive = true
         });
         
+        var formBuilder = productForm.ToForm(isEdit ? "Save Changes" : "Create Product")
+            .Label(m => m.ProductCode, "Product Code")
+            .Builder(m => m.ProductCode, s => s.ToTextInput().Disabled(isEdit))
+            .Label(m => m.Name, "Product Name")
+            .Label(m => m.Description, "Description")
+            .Builder(m => m.Description, s => s.ToTextAreaInput())
+            .Label(m => m.Category, "Category")
+            .Label(m => m.Supplier, "Supplier")
+            .Label(m => m.Price, "Sale Price ($)")
+            .Label(m => m.Cost, "Cost ($)")
+            .Label(m => m.QuantityInStock, "Quantity in Stock")
+            .Label(m => m.MinimumStockLevel, "Minimum Stock Level")
+            .Label(m => m.IsActive, "Status")
+            .Builder(m => m.IsActive, s => s.ToSelectInput(new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
+            .Remove(m => m.Id)
+            .Remove(m => m.CreatedAt)
+            .Remove(m => m.UpdatedAt)
+            .Required(m => m.Name)
+            .Validate<decimal>(m => m.Price, price =>
+                (price >= 0, "Sale price cannot be negative"))
+            .Validate<decimal>(m => m.Cost, cost =>
+                (cost >= 0, "Cost cannot be negative"))
+            .Validate<int>(m => m.QuantityInStock, quantity =>
+                (quantity >= 0, "Quantity in stock cannot be negative"))
+            .Validate<int>(m => m.MinimumStockLevel, minStock =>
+                (minStock >= 0, "Minimum stock level cannot be negative"));
+        
+        var (onSubmit, formView, validationView, loading) = formBuilder.UseForm(this.Context);
+        
+        async ValueTask HandleSubmit()
+        {
+            if (await onSubmit())
+            {
+                try
+                {
+                    if (isEdit && existingProduct != null)
+                    {
+                        existingProduct.ProductCode = productForm.Value.ProductCode;
+                        existingProduct.Name = productForm.Value.Name;
+                        existingProduct.Description = productForm.Value.Description;
+                        existingProduct.Price = productForm.Value.Price;
+                        existingProduct.Cost = productForm.Value.Cost;
+                        existingProduct.QuantityInStock = productForm.Value.QuantityInStock;
+                        existingProduct.MinimumStockLevel = productForm.Value.MinimumStockLevel;
+                        existingProduct.Category = productForm.Value.Category;
+                        existingProduct.Supplier = productForm.Value.Supplier;
+                        existingProduct.IsActive = productForm.Value.IsActive;
+                        existingProduct.UpdatedAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var productCode = string.IsNullOrWhiteSpace(productForm.Value.ProductCode) 
+                            ? $"PROD-{DateTime.UtcNow:yyyyMMddHHmmss}" 
+                            : productForm.Value.ProductCode;
+                            
+                        var newProduct = new Product
+                        {
+                            ProductCode = productCode,
+                            Name = productForm.Value.Name,
+                            Description = productForm.Value.Description,
+                            Price = productForm.Value.Price,
+                            Cost = productForm.Value.Cost,
+                            QuantityInStock = productForm.Value.QuantityInStock,
+                            MinimumStockLevel = productForm.Value.MinimumStockLevel,
+                            Category = productForm.Value.Category,
+                            Supplier = productForm.Value.Supplier,
+                            IsActive = productForm.Value.IsActive,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.Products.Add(newProduct);
+                    }
+                    
+                    context.SaveChanges();
+                    client.Toast(isEdit ? "Product updated successfully!" : "Product created successfully!");
+                    onClose?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    client.Toast($"Error: {ex.Message}", "Error");
+                }
+            }
+        }
+        
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
-                .Add(new Button("Save")
+                .Add(new Button(isEdit ? "Save Changes" : "Create Product")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            if (string.IsNullOrWhiteSpace(productForm.Value.ProductCode))
-                            {
-                                client.Toast("Product Code is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (string.IsNullOrWhiteSpace(productForm.Value.Name))
-                            {
-                                client.Toast("Product Name is required", "Validation Error");
-                                return;
-                            }
-                            
-                            if (productForm.Value.Price < 0 || productForm.Value.Cost < 0)
-                            {
-                                client.Toast("Price and Cost cannot be negative", "Validation Error");
-                                return;
-                            }
-                            
-                            if (productForm.Value.QuantityInStock < 0)
-                            {
-                                client.Toast("Quantity cannot be negative", "Validation Error");
-                                return;
-                            }
-                            
-                            if (isEdit && existingProduct != null)
-                            {
-                                existingProduct.ProductCode = productForm.Value.ProductCode;
-                                existingProduct.Name = productForm.Value.Name;
-                                existingProduct.Description = productForm.Value.Description;
-                                existingProduct.Price = productForm.Value.Price;
-                                existingProduct.Cost = productForm.Value.Cost;
-                                existingProduct.QuantityInStock = productForm.Value.QuantityInStock;
-                                existingProduct.MinimumStockLevel = productForm.Value.MinimumStockLevel;
-                                existingProduct.Category = productForm.Value.Category;
-                                existingProduct.Supplier = productForm.Value.Supplier;
-                                existingProduct.IsActive = productForm.Value.IsActive;
-                                existingProduct.UpdatedAt = DateTime.UtcNow;
-                            }
-                            else
-                            {
-                                var newProduct = new Product
-                                {
-                                    ProductCode = productForm.Value.ProductCode,
-                                    Name = productForm.Value.Name,
-                                    Description = productForm.Value.Description,
-                                    Price = productForm.Value.Price,
-                                    Cost = productForm.Value.Cost,
-                                    QuantityInStock = productForm.Value.QuantityInStock,
-                                    MinimumStockLevel = productForm.Value.MinimumStockLevel,
-                                    Category = productForm.Value.Category,
-                                    Supplier = productForm.Value.Supplier,
-                                    IsActive = productForm.Value.IsActive,
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
-                                };
-                                context.Products.Add(newProduct);
-                            }
-                            
-                            context.SaveChanges();
-                            client.Toast(isEdit ? "Product updated successfully!" : "Product created successfully!");
-                            onClose?.Invoke();
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error: {ex.Message}", "Error");
-                        }
-                    }))
+                    .Loading(loading)
+                    .Disabled(loading)
+                    .HandleClick(_ => HandleSubmit()))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
-                    .HandleClick(_ => onClose?.Invoke())),
-            
-            Layout.Vertical().Gap(4)
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Product Information"))
-                        .Add(Text.Small("Product Code"))
-                        .Add(new TextInput(productForm.Value.ProductCode, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.ProductCode = e.Value;
-                            productForm.Set(cloned);
-                        }).Placeholder("PROD-001").Disabled(isEdit))
-                        .Add(Text.Small("Product Name"))
-                        .Add(new TextInput(productForm.Value.Name, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Name = e.Value;
-                            productForm.Set(cloned);
-                        }).Placeholder("Product Name"))
-                        .Add(Text.Small("Description"))
-                        .Add(new TextInput(productForm.Value.Description, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Description = e.Value;
-                            productForm.Set(cloned);
-                        }).Placeholder("Product description...").Variant(TextInputs.Textarea))
-                        .Add(Text.Small("Category"))
-                        .Add(new TextInput(productForm.Value.Category, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Category = e.Value;
-                            productForm.Set(cloned);
-                        }).Placeholder("Electronics"))
-                        .Add(Text.Small("Supplier"))
-                        .Add(new TextInput(productForm.Value.Supplier, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Supplier = e.Value;
-                            productForm.Set(cloned);
-                        }).Placeholder("Supplier Name"))
-                ).Title("Product Details"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Pricing Information"))
-                        .Add(Text.Small("Sale Price ($)"))
-                        .Add(new NumberInput<decimal>(productForm.Value.Price, v => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Price = v;
-                            productForm.Set(cloned);
-                        }).Placeholder("0.00"))
-                        .Add(Text.Small("Cost ($)"))
-                        .Add(new NumberInput<decimal>(productForm.Value.Cost, v => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.Cost = v;
-                            productForm.Set(cloned);
-                        }).Placeholder("0.00"))
-                        .Add(Text.Small("Margin"))
-                        .Add(Text.H3(productForm.Value.Price > 0 
-                            ? $"{((productForm.Value.Price - productForm.Value.Cost) / productForm.Value.Price * 100):N2}%" 
-                            : "0%"))
-                ).Title("Pricing"))
-                
-                .Add(new Card(
-                    Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Inventory"))
-                        .Add(Text.Small("Quantity in Stock"))
-                        .Add(new NumberInput<int>(productForm.Value.QuantityInStock, v => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.QuantityInStock = v;
-                            productForm.Set(cloned);
-                        }).Placeholder("0"))
-                        .Add(Text.Small("Minimum Stock Level"))
-                        .Add(new NumberInput<int>(productForm.Value.MinimumStockLevel, v => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.MinimumStockLevel = v;
-                            productForm.Set(cloned);
-                        }).Placeholder("10"))
-                        .Add(Text.Small("Status"))
-                        .Add(new SelectInput<bool>(productForm.Value.IsActive, e => {
-                            var cloned = CloneProduct(productForm.Value);
-                            cloned.IsActive = e.Value;
-                            productForm.Set(cloned);
-                        }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
-                ).Title("Stock"))
+                    .Disabled(loading)
+                    .HandleClick(_ => onClose?.Invoke()))
+                .Add(validationView),
+            formView
         );
     }
 }
 
 public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewBase
 {
-    private StockMovement CloneStockMovement(StockMovement source) => new StockMovement
-    {
-        Id = source.Id,
-        ProductId = source.ProductId,
-        MovementType = source.MovementType,
-        Quantity = source.Quantity,
-        Reference = source.Reference,
-        Notes = source.Notes,
-        MovementDate = source.MovementDate,
-        CreatedAt = source.CreatedAt
-    };
-    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -432,65 +331,91 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
         
         var movementTypeOptions = new[] { MovementType.In, MovementType.Out, MovementType.Transfer, MovementType.Adjustment };
         
+        var formBuilder = adjustmentForm.ToForm("Adjust Stock")
+            .Label(m => m.MovementType, "Movement Type")
+            .Builder(m => m.MovementType, s => s.ToSelectInput(movementTypeOptions.ToOptions()))
+            .Label(m => m.Quantity, "Quantity")
+            .Label(m => m.Reference, "Reference")
+            .Label(m => m.MovementDate, "Movement Date")
+            .Builder(m => m.MovementDate, s => s.ToDateTimeInput())
+            .Label(m => m.Notes, "Notes")
+            .Builder(m => m.Notes, s => s.ToTextAreaInput())
+            .Remove(m => m.Id)
+            .Remove(m => m.ProductId)
+            .Remove(m => m.CreatedAt)
+            .Required(m => m.MovementType, m => m.Quantity, m => m.MovementDate)
+            .Validate<int>(m => m.Quantity, quantity =>
+                (quantity > 0, "Quantity must be at least 1"))
+            .Validate<DateTime>(m => m.MovementDate, movementDate =>
+                (movementDate <= DateTime.UtcNow.AddDays(1), "Movement date cannot be more than 1 day in the future"));
+        
+        var (onSubmit, formView, validationView, loading) = formBuilder.UseForm(this.Context);
+        
+        async ValueTask HandleSubmit()
+        {
+            if (await onSubmit())
+            {
+                try
+                {
+                    var dbProduct = context.Products.FirstOrDefault(p => p.Id == productId);
+                    if (dbProduct != null)
+                    {
+                        // Check for insufficient stock on outgoing movements
+                        if (adjustmentForm.Value.MovementType == MovementType.Out && dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
+                        {
+                            client.Toast("Insufficient stock quantity", "Validation Error");
+                            return;
+                        }
+                        
+                        // Adjust stock based on movement type
+                        if (adjustmentForm.Value.MovementType == MovementType.In || adjustmentForm.Value.MovementType == MovementType.Adjustment)
+                        {
+                            dbProduct.QuantityInStock += adjustmentForm.Value.Quantity;
+                        }
+                        else if (adjustmentForm.Value.MovementType == MovementType.Out)
+                        {
+                            dbProduct.QuantityInStock -= adjustmentForm.Value.Quantity;
+                        }
+                        
+                        // Record stock movement
+                        var stockMovement = new StockMovement
+                        {
+                            ProductId = productId,
+                            MovementType = adjustmentForm.Value.MovementType,
+                            Quantity = adjustmentForm.Value.Quantity,
+                            Reference = adjustmentForm.Value.Reference,
+                            Notes = adjustmentForm.Value.Notes,
+                            MovementDate = adjustmentForm.Value.MovementDate,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        context.StockMovements.Add(stockMovement);
+                        
+                        dbProduct.UpdatedAt = DateTime.UtcNow;
+                        context.SaveChanges();
+                        
+                        client.Toast($"Stock adjusted successfully! New quantity: {dbProduct.QuantityInStock}");
+                        onClose?.Invoke();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    client.Toast($"Error: {ex.Message}", "Error");
+                }
+            }
+        }
+        
         return new FooterLayout(
             Layout.Horizontal().Gap(2)
-                .Add(new Button("Save")
+                .Add(new Button("Adjust Stock")
                     .Variant(ButtonVariant.Primary)
-                    .HandleClick(_ => {
-                        try
-                        {
-                            if (adjustmentForm.Value.Quantity <= 0)
-                            {
-                                client.Toast("Quantity must be at least 1", "Validation Error");
-                                return;
-                            }
-                            
-                            var dbProduct = context.Products.FirstOrDefault(p => p.Id == productId);
-                            if (dbProduct != null)
-                            {
-                                // Adjust stock based on movement type
-                                if (adjustmentForm.Value.MovementType == MovementType.In || adjustmentForm.Value.MovementType == MovementType.Adjustment)
-                                {
-                                    dbProduct.QuantityInStock += adjustmentForm.Value.Quantity;
-                                }
-                                else if (adjustmentForm.Value.MovementType == MovementType.Out)
-                                {
-                                    if (dbProduct.QuantityInStock < adjustmentForm.Value.Quantity)
-                                    {
-                                        client.Toast("Insufficient stock quantity", "Validation Error");
-                                        return;
-                                    }
-                                    dbProduct.QuantityInStock -= adjustmentForm.Value.Quantity;
-                                }
-                                
-                                // Record stock movement
-                                var stockMovement = new StockMovement
-                                {
-                                    ProductId = productId,
-                                    MovementType = adjustmentForm.Value.MovementType,
-                                    Quantity = adjustmentForm.Value.Quantity,
-                                    Reference = adjustmentForm.Value.Reference,
-                                    Notes = adjustmentForm.Value.Notes,
-                                    MovementDate = adjustmentForm.Value.MovementDate,
-                                    CreatedAt = DateTime.UtcNow
-                                };
-                                context.StockMovements.Add(stockMovement);
-                                
-                                dbProduct.UpdatedAt = DateTime.UtcNow;
-                                context.SaveChanges();
-                                
-                                client.Toast($"Stock adjusted successfully! New quantity: {dbProduct.QuantityInStock}");
-                                onClose?.Invoke();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            client.Toast($"Error: {ex.Message}", "Error");
-                        }
-                    }))
+                    .Loading(loading)
+                    .Disabled(loading)
+                    .HandleClick(_ => HandleSubmit()))
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)
-                    .HandleClick(_ => onClose?.Invoke())),
+                    .Disabled(loading)
+                    .HandleClick(_ => onClose?.Invoke()))
+                .Add(validationView),
             
             Layout.Vertical().Gap(4)
                 .Add(new Card(
@@ -502,45 +427,14 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             ? new Badge("Low Stock").Variant(BadgeVariant.Destructive) 
                             : new Badge("In Stock").Variant(BadgeVariant.Success))
                 ).Title("Current Status"))
-                
+                .Add(formView)
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
-                        .Add(Text.Small("Stock Adjustment"))
-                        .Add(Text.Small("Movement Type"))
-                        .Add(new SelectInput<string>(adjustmentForm.Value.MovementType, e => {
-                            var cloned = CloneStockMovement(adjustmentForm.Value);
-                            cloned.MovementType = e.Value;
-                            adjustmentForm.Set(cloned);
-                        }, movementTypeOptions.ToOptions()))
-                        .Add(Text.Small("Quantity"))
-                        .Add(new NumberInput<int>(adjustmentForm.Value.Quantity, v => {
-                            var cloned = CloneStockMovement(adjustmentForm.Value);
-                            cloned.Quantity = v;
-                            adjustmentForm.Set(cloned);
-                        }).Placeholder("1"))
-                        .Add(Text.Small("Reference"))
-                        .Add(new TextInput(adjustmentForm.Value.Reference, e => {
-                            var cloned = CloneStockMovement(adjustmentForm.Value);
-                            cloned.Reference = e.Value;
-                            adjustmentForm.Set(cloned);
-                        }).Placeholder("PO-12345"))
-                        .Add(Text.Small("Movement Date"))
-                        .Add(new DateTimeInput<DateTime>(adjustmentForm.Value.MovementDate, e => {
-                            var cloned = CloneStockMovement(adjustmentForm.Value);
-                            cloned.MovementDate = e.Value;
-                            adjustmentForm.Set(cloned);
-                        }))
-                        .Add(Text.Small("Notes"))
-                        .Add(new TextInput(adjustmentForm.Value.Notes, e => {
-                            var cloned = CloneStockMovement(adjustmentForm.Value);
-                            cloned.Notes = e.Value;
-                            adjustmentForm.Set(cloned);
-                        }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("New Stock Level"))
                         .Add(Text.H3(adjustmentForm.Value.MovementType == MovementType.Out 
                             ? $"{product.QuantityInStock - adjustmentForm.Value.Quantity}" 
                             : $"{product.QuantityInStock + adjustmentForm.Value.Quantity}"))
-                ).Title("Adjustment Details"))
+                ).Title("Preview"))
         );
     }
 }
