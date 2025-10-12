@@ -336,9 +336,9 @@ public class ProductFormSheet(int? productId = null, Action? onClose = null) : V
                             productForm.Set(updated);
                         }).Placeholder("0.00"))
                         .Add(Text.Small("Margin"))
-                        .Add(Text.Block(productForm.Value.Price > 0 
+                        .Add(Text.H3(productForm.Value.Price > 0 
                             ? $"{((productForm.Value.Price - productForm.Value.Cost) / productForm.Value.Price * 100):N2}%" 
-                            : "0%").Variant(TextVariants.Large))
+                            : "0%"))
                 ).Title("Pricing"))
                 
                 .Add(new Card(
@@ -500,9 +500,9 @@ public class StockAdjustmentSheet(int productId, Action? onClose = null) : ViewB
                             adjustmentForm.Set(updated);
                         }).Placeholder("Additional notes...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("New Stock Level"))
-                        .Add(Text.Block(adjustmentForm.Value.MovementType == "Out" 
+                        .Add(Text.H3(adjustmentForm.Value.MovementType == "Out" 
                             ? $"{product.QuantityInStock - adjustmentForm.Value.Quantity}" 
-                            : $"{product.QuantityInStock + adjustmentForm.Value.Quantity}").Variant(TextVariants.Large))
+                            : $"{product.QuantityInStock + adjustmentForm.Value.Quantity}"))
                 ).Title("Adjustment Details"))
         );
     }
