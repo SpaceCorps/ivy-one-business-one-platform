@@ -211,6 +211,19 @@ public class TimesheetDetailBlade(int timesheetId, Action? onRefresh = null) : V
 
 public class TimesheetFormSheet(int? timesheetId = null, Action? onClose = null) : ViewBase
 {
+    private Timesheet CloneTimesheet(Timesheet source) => new Timesheet
+    {
+        Id = source.Id,
+        ProjectId = source.ProjectId,
+        EmployeeName = source.EmployeeName,
+        Date = source.Date,
+        HoursWorked = source.HoursWorked,
+        Description = source.Description,
+        Status = source.Status,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -309,39 +322,39 @@ public class TimesheetFormSheet(int? timesheetId = null, Action? onClose = null)
                         .Add(Text.Small("Timesheet Information"))
                         .Add(Text.Small("Employee Name"))
                         .Add(new TextInput(timesheetForm.Value.EmployeeName, e => {
-                            var updated = timesheetForm.Value;
-                            updated.EmployeeName = e.Value;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.EmployeeName = e.Value;
+                            timesheetForm.Set(cloned);
                         }).Placeholder("John Doe"))
                         .Add(Text.Small("Project"))
                         .Add(new SelectInput<int>(timesheetForm.Value.ProjectId, e => {
-                            var updated = timesheetForm.Value;
-                            updated.ProjectId = e.Value;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.ProjectId = e.Value;
+                            timesheetForm.Set(cloned);
                         }, projects.Select(p => (p.Id, p.Name)).ToOptions()))
                         .Add(Text.Small("Date"))
                         .Add(new DateTimeInput<DateTime>(timesheetForm.Value.Date, e => {
-                            var updated = timesheetForm.Value;
-                            updated.Date = e.Value;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.Date = e.Value;
+                            timesheetForm.Set(cloned);
                         }))
                         .Add(Text.Small("Hours Worked"))
                         .Add(new NumberInput<decimal>(timesheetForm.Value.HoursWorked, v => {
-                            var updated = timesheetForm.Value;
-                            updated.HoursWorked = v;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.HoursWorked = v;
+                            timesheetForm.Set(cloned);
                         }).Placeholder("8.0"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(timesheetForm.Value.Description, e => {
-                            var updated = timesheetForm.Value;
-                            updated.Description = e.Value;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.Description = e.Value;
+                            timesheetForm.Set(cloned);
                         }).Placeholder("Work description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(timesheetForm.Value.Status, e => {
-                            var updated = timesheetForm.Value;
-                            updated.Status = e.Value;
-                            timesheetForm.Set(updated);
+                            var cloned = CloneTimesheet(timesheetForm.Value);
+                            cloned.Status = e.Value;
+                            timesheetForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Timesheet Details"))
         );
