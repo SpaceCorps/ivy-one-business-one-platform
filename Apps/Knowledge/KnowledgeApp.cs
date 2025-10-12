@@ -356,6 +356,20 @@ public class CategoryDetailBlade(int categoryId, Action? onRefresh = null) : Vie
 
 public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : ViewBase
 {
+    private Data.Article CloneArticle(Data.Article source) => new Data.Article
+    {
+        Id = source.Id,
+        Title = source.Title,
+        Content = source.Content,
+        Summary = source.Summary,
+        CategoryId = source.CategoryId,
+        Status = source.Status,
+        ViewCount = source.ViewCount,
+        Author = source.Author,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -450,21 +464,21 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
                         .Add(Text.Small("Article Information"))
                         .Add(Text.Small("Title"))
                         .Add(new TextInput(articleForm.Value.Title, e => {
-                            var updated = articleForm.Value;
-                            updated.Title = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.Title = e.Value;
+                            articleForm.Set(cloned);
                         }).Placeholder("Article Title"))
                         .Add(Text.Small("Summary"))
                         .Add(new TextInput(articleForm.Value.Summary, e => {
-                            var updated = articleForm.Value;
-                            updated.Summary = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.Summary = e.Value;
+                            articleForm.Set(cloned);
                         }).Placeholder("Brief summary...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Content"))
                         .Add(new TextInput(articleForm.Value.Content, e => {
-                            var updated = articleForm.Value;
-                            updated.Content = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.Content = e.Value;
+                            articleForm.Set(cloned);
                         }).Placeholder("Article content...").Variant(TextInputs.Textarea))
                 ).Title("Article Details"))
                 
@@ -473,21 +487,21 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
                         .Add(Text.Small("Article Settings"))
                         .Add(Text.Small("Category"))
                         .Add(new SelectInput<int>(articleForm.Value.CategoryId, e => {
-                            var updated = articleForm.Value;
-                            updated.CategoryId = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.CategoryId = e.Value;
+                            articleForm.Set(cloned);
                         }, categories.Select(c => (c.Id, c.Name)).ToOptions()))
                         .Add(Text.Small("Author"))
                         .Add(new TextInput(articleForm.Value.Author, e => {
-                            var updated = articleForm.Value;
-                            updated.Author = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.Author = e.Value;
+                            articleForm.Set(cloned);
                         }).Placeholder("Author Name"))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<string>(articleForm.Value.Status, e => {
-                            var updated = articleForm.Value;
-                            updated.Status = e.Value;
-                            articleForm.Set(updated);
+                            var cloned = CloneArticle(articleForm.Value);
+                            cloned.Status = e.Value;
+                            articleForm.Set(cloned);
                         }, statusOptions.ToOptions()))
                 ).Title("Settings"))
         );
@@ -496,6 +510,17 @@ public class ArticleFormSheet(int? articleId = null, Action? onClose = null) : V
 
 public class CategoryFormSheet(int? categoryId = null, Action? onClose = null) : ViewBase
 {
+    private Category CloneCategory(Category source) => new Category
+    {
+        Id = source.Id,
+        Name = source.Name,
+        Description = source.Description,
+        ParentCategoryId = source.ParentCategoryId,
+        IsActive = source.IsActive,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -563,21 +588,21 @@ public class CategoryFormSheet(int? categoryId = null, Action? onClose = null) :
                         .Add(Text.Small("Category Information"))
                         .Add(Text.Small("Category Name"))
                         .Add(new TextInput(categoryForm.Value.Name, e => {
-                            var updated = categoryForm.Value;
-                            updated.Name = e.Value;
-                            categoryForm.Set(updated);
+                            var cloned = CloneCategory(categoryForm.Value);
+                            cloned.Name = e.Value;
+                            categoryForm.Set(cloned);
                         }).Placeholder("Category Name"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(categoryForm.Value.Description, e => {
-                            var updated = categoryForm.Value;
-                            updated.Description = e.Value;
-                            categoryForm.Set(updated);
+                            var cloned = CloneCategory(categoryForm.Value);
+                            cloned.Description = e.Value;
+                            categoryForm.Set(cloned);
                         }).Placeholder("Category description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Status"))
                         .Add(new SelectInput<bool>(categoryForm.Value.IsActive, e => {
-                            var updated = categoryForm.Value;
-                            updated.IsActive = e.Value;
-                            categoryForm.Set(updated);
+                            var cloned = CloneCategory(categoryForm.Value);
+                            cloned.IsActive = e.Value;
+                            categoryForm.Set(cloned);
                         }, new[] { (true, "Active"), (false, "Inactive") }.ToOptions()))
                 ).Title("Category Details"))
         );
