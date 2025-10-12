@@ -804,7 +804,7 @@ public class OpportunitiesBlade : ViewBase
                 EF.Functions.Like(o.Contact.LastName, searchPattern));
         }
         
-        var opportunities = query.OrderByDescending(o => o.Amount).ToList();
+        var opportunities = query.ToList().OrderByDescending(o => o.Amount).ToList();
         
         var listItems = opportunities.Select(opp => new ListItem(
             title: opp.Name,
