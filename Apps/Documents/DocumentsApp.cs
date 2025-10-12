@@ -187,6 +187,23 @@ public class DocumentDetailBlade(int documentId, Action? onRefresh = null) : Vie
 
 public class DocumentFormSheet(int? documentId = null, Action? onClose = null) : ViewBase
 {
+    private Document CloneDocument(Document source) => new Document
+    {
+        Id = source.Id,
+        Title = source.Title,
+        Description = source.Description,
+        FileName = source.FileName,
+        FilePath = source.FilePath,
+        FileType = source.FileType,
+        FileSize = source.FileSize,
+        Category = source.Category,
+        Tags = source.Tags,
+        Author = source.Author,
+        IsPublic = source.IsPublic,
+        CreatedAt = source.CreatedAt,
+        UpdatedAt = source.UpdatedAt
+    };
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -289,39 +306,39 @@ public class DocumentFormSheet(int? documentId = null, Action? onClose = null) :
                         .Add(Text.Small("Document Information"))
                         .Add(Text.Small("Title"))
                         .Add(new TextInput(documentForm.Value.Title, e => {
-                            var updated = documentForm.Value;
-                            updated.Title = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.Title = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("Document Title"))
                         .Add(Text.Small("Description"))
                         .Add(new TextInput(documentForm.Value.Description, e => {
-                            var updated = documentForm.Value;
-                            updated.Description = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.Description = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("Document description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("File Name"))
                         .Add(new TextInput(documentForm.Value.FileName, e => {
-                            var updated = documentForm.Value;
-                            updated.FileName = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.FileName = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("document.pdf"))
                         .Add(Text.Small("File Path"))
                         .Add(new TextInput(documentForm.Value.FilePath, e => {
-                            var updated = documentForm.Value;
-                            updated.FilePath = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.FilePath = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("/documents/file.pdf"))
                         .Add(Text.Small("File Type"))
                         .Add(new TextInput(documentForm.Value.FileType, e => {
-                            var updated = documentForm.Value;
-                            updated.FileType = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.FileType = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("PDF"))
                         .Add(Text.Small("File Size (bytes)"))
                         .Add(new NumberInput<long>(documentForm.Value.FileSize, v => {
-                            var updated = documentForm.Value;
-                            updated.FileSize = v;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.FileSize = v;
+                            documentForm.Set(cloned);
                         }).Placeholder("0"))
                 ).Title("Document Details"))
                 
@@ -330,27 +347,27 @@ public class DocumentFormSheet(int? documentId = null, Action? onClose = null) :
                         .Add(Text.Small("Document Settings"))
                         .Add(Text.Small("Category"))
                         .Add(new SelectInput<string>(documentForm.Value.Category, e => {
-                            var updated = documentForm.Value;
-                            updated.Category = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.Category = e.Value;
+                            documentForm.Set(cloned);
                         }, categoryOptions.ToOptions()))
                         .Add(Text.Small("Author"))
                         .Add(new TextInput(documentForm.Value.Author, e => {
-                            var updated = documentForm.Value;
-                            updated.Author = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.Author = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("Author Name"))
                         .Add(Text.Small("Tags (comma separated)"))
                         .Add(new TextInput(documentForm.Value.Tags, e => {
-                            var updated = documentForm.Value;
-                            updated.Tags = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.Tags = e.Value;
+                            documentForm.Set(cloned);
                         }).Placeholder("tag1, tag2, tag3"))
                         .Add(Text.Small("Visibility"))
                         .Add(new SelectInput<bool>(documentForm.Value.IsPublic, e => {
-                            var updated = documentForm.Value;
-                            updated.IsPublic = e.Value;
-                            documentForm.Set(updated);
+                            var cloned = CloneDocument(documentForm.Value);
+                            cloned.IsPublic = e.Value;
+                            documentForm.Set(cloned);
                         }, new[] { (true, "Public"), (false, "Private") }.ToOptions()))
                 ).Title("Settings"))
         );
