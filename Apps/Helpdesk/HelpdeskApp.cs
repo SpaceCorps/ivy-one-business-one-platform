@@ -208,6 +208,13 @@ public class TicketDetailBlade(int ticketId, Action? onRefresh = null) : ViewBas
 
 public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : ViewBase
 {
+    private void UpdateField(IState<Ticket> state, Action<Ticket> updateAction)
+    {
+        var updated = state.Value;
+        updateAction(updated);
+        state.Set(updated);
+    }
+    
     public override object? Build()
     {
         var client = this.UseService<IClientProvider>();
@@ -218,7 +225,7 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
         
         var ticketForm = this.UseState(existingTicket ?? new Ticket
         {
-            TicketNumber = $"HD-{DateTime.Now:yyyyMMdd-HHmmss}",
+            TicketNumber = $"HD-{DateTime.UtcNow:yyyyMMdd-HHmmss}",
             CustomerName = "",
             CustomerEmail = "",
             Subject = "",
@@ -315,68 +322,53 @@ public class TicketFormSheet(int? ticketId = null, Action? onClose = null) : Vie
                         .Add(Text.Small("Ticket Information"))
                         .Add(Text.Small("Ticket Number"))
                         .Add(new TextInput(ticketForm.Value.TicketNumber, e => {
-                            var updated = ticketForm.Value;
-                            updated.TicketNumber = e.Value;
-                            ticketForm.Set(updated);
+                            if (!isEdit) UpdateField(ticketForm, t => t.TicketNumber = e.Value);
                         }).Placeholder("HD-001").Disabled(isEdit))
                         .Add(Text.Small("Subject"))
-                        .Add(new TextInput(ticketForm.Value.Subject, e => {
-                            var updated = ticketForm.Value;
-                            updated.Subject = e.Value;
-                            ticketForm.Set(updated);
-                        }).Placeholder("Issue subject"))
+                        .Add(new TextInput(ticketForm.Value.Subject, e => 
+                            UpdateField(ticketForm, t => t.Subject = e.Value)
+                        ).Placeholder("Issue subject"))
                         .Add(Text.Small("Description"))
-                        .Add(new TextInput(ticketForm.Value.Description, e => {
-                            var updated = ticketForm.Value;
-                            updated.Description = e.Value;
-                            ticketForm.Set(updated);
-                        }).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
+                        .Add(new TextInput(ticketForm.Value.Description, e => 
+                            UpdateField(ticketForm, t => t.Description = e.Value)
+                        ).Placeholder("Detailed description...").Variant(TextInputs.Textarea))
                         .Add(Text.Small("Category"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => {
-                            var updated = ticketForm.Value;
-                            updated.Category = e.Value;
-                            ticketForm.Set(updated);
-                        }, categoryOptions.ToOptions()))
+                        .Add(new SelectInput<string>(ticketForm.Value.Category, e => 
+                            UpdateField(ticketForm, t => t.Category = e.Value), 
+                            categoryOptions.ToOptions()
+                        ))
                 ).Title("Ticket Details"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Customer Information"))
                         .Add(Text.Small("Customer Name"))
-                        .Add(new TextInput(ticketForm.Value.CustomerName, e => {
-                            var updated = ticketForm.Value;
-                            updated.CustomerName = e.Value;
-                            ticketForm.Set(updated);
-                        }).Placeholder("John Doe"))
+                        .Add(new TextInput(ticketForm.Value.CustomerName, e => 
+                            UpdateField(ticketForm, t => t.CustomerName = e.Value)
+                        ).Placeholder("John Doe"))
                         .Add(Text.Small("Customer Email"))
-                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => {
-                            var updated = ticketForm.Value;
-                            updated.CustomerEmail = e.Value;
-                            ticketForm.Set(updated);
-                        }).Placeholder("customer@example.com"))
+                        .Add(new TextInput(ticketForm.Value.CustomerEmail, e => 
+                            UpdateField(ticketForm, t => t.CustomerEmail = e.Value)
+                        ).Placeholder("customer@example.com"))
                 ).Title("Customer"))
                 
                 .Add(new Card(
                     Layout.Vertical().Gap(3)
                         .Add(Text.Small("Ticket Management"))
                         .Add(Text.Small("Status"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Status, e => {
-                            var updated = ticketForm.Value;
-                            updated.Status = e.Value;
-                            ticketForm.Set(updated);
-                        }, statusOptions.ToOptions()))
+                        .Add(new SelectInput<string>(ticketForm.Value.Status, e => 
+                            UpdateField(ticketForm, t => t.Status = e.Value), 
+                            statusOptions.ToOptions()
+                        ))
                         .Add(Text.Small("Priority"))
-                        .Add(new SelectInput<string>(ticketForm.Value.Priority, e => {
-                            var updated = ticketForm.Value;
-                            updated.Priority = e.Value;
-                            ticketForm.Set(updated);
-                        }, priorityOptions.ToOptions()))
+                        .Add(new SelectInput<string>(ticketForm.Value.Priority, e => 
+                            UpdateField(ticketForm, t => t.Priority = e.Value), 
+                            priorityOptions.ToOptions()
+                        ))
                         .Add(Text.Small("Assigned To"))
-                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => {
-                            var updated = ticketForm.Value;
-                            updated.AssignedTo = e.Value;
-                            ticketForm.Set(updated);
-                        }).Placeholder("Support Agent"))
+                        .Add(new TextInput(ticketForm.Value.AssignedTo, e => 
+                            UpdateField(ticketForm, t => t.AssignedTo = e.Value)
+                        ).Placeholder("Support Agent"))
                 ).Title("Management"))
         );
     }

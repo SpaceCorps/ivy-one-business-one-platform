@@ -14,6 +14,7 @@ public class Ticket
     [MaxLength(200)]
     public string CustomerName { get; set; } = string.Empty;
     
+    [Required]
     [EmailAddress]
     [MaxLength(200)]
     public string CustomerEmail { get; set; } = string.Empty;
