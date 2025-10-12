@@ -43,7 +43,7 @@ public class ManufacturingRootBlade : ViewBase
         
         return BladeHelper.WithHeader(
             Layout.Horizontal()
-                .Gap(8)
+                .Gap(4)
                 .Add(searchTerm.ToTextInput().Placeholder("Search work orders..."))
                 .Add(new Button("New Work Order")
                     .Icon(Icons.Plus)
@@ -85,7 +85,7 @@ public class CreateWorkOrderSheet : ViewBase
         var priorities = new[] { "Low", "Normal", "High", "Urgent" };
 
         return new FooterLayout(
-            Layout.Horizontal().Gap(8)
+            Layout.Horizontal().Gap(4)
                 .Add(new Button("Create", _ => {
                     if (string.IsNullOrWhiteSpace(productName.Value))
                     {
@@ -123,10 +123,10 @@ public class CreateWorkOrderSheet : ViewBase
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)),
             Layout.Vertical()
-                .Gap(16)
+                .Gap(4)
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Work Order Number"))
                         .Add(workOrderNumber.ToTextInput().Placeholder("WO-001").Disabled(true))
                         .Add(Text.Small("Product Name *"))
@@ -138,7 +138,7 @@ public class CreateWorkOrderSheet : ViewBase
                 ).Title("Basic Information"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Planned Start Date"))
                         .Add(plannedStartDate.ToDateInput().Placeholder("YYYY-MM-DD"))
                         .Add(Text.Small("Planned End Date"))
@@ -146,7 +146,7 @@ public class CreateWorkOrderSheet : ViewBase
                 ).Title("Schedule"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Notes (Optional)"))
                         .Add(notes.ToTextInput().Placeholder("Add any additional notes..."))
                 ).Title("Additional Information"))
@@ -171,12 +171,12 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
             return "Work order not found";
         
         return Layout.Vertical()
-            .Gap(16)
+            .Gap(4)
             .Add(new Card(
                 Layout.Vertical()
-                    .Gap(12)
+                    .Gap(4)
                     .Add(Layout.Horizontal()
-                        .Gap(8)
+                        .Gap(4)
                         .Add(new Badge(workOrder.Status)
                             .Variant(workOrder.Status == "Completed" ? BadgeVariant.Success :
                                    workOrder.Status == "In Production" ? BadgeVariant.Primary :
@@ -208,7 +208,7 @@ public class WorkOrderDetailBlade(int workOrderId) : ViewBase
             ).Title("Work Order Details"))
             .Add(new Card(
                 Layout.Horizontal()
-                    .Gap(8)
+                    .Gap(4)
                     .Wrap(true)
                     // Start Production - тільки для Scheduled
                     .Add(workOrder.Status == "Scheduled" 
@@ -319,7 +319,7 @@ public class UpdateProgressSheet : ViewBase
         var notes = this.UseState(workOrder.Notes ?? "");
 
         return new FooterLayout(
-            Layout.Horizontal().Gap(8)
+            Layout.Horizontal().Gap(4)
                 .Add(new Button("Update", _ => {
                     if (!int.TryParse(progress.Value, out var progressValue) || progressValue < 0 || progressValue > 100)
                     {
@@ -355,24 +355,24 @@ public class UpdateProgressSheet : ViewBase
                 .Add(new Button("Cancel")
                     .Variant(ButtonVariant.Outline)),
             Layout.Vertical()
-                .Gap(16)
+                .Gap(4)
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Current Progress"))
                         .Add(new Progress(workOrder.Progress))
                         .Add(Text.Small($"{workOrder.Progress}% Complete"))
                 ).Title("Current Status"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("New Progress (0-100) *"))
                         .Add(progress.ToTextInput().Placeholder("Enter progress percentage"))
                         .Add(Text.Muted("Enter a value between 0 and 100"))
                 ).Title("Update Progress"))
                 .Add(new Card(
                     Layout.Vertical()
-                        .Gap(12)
+                        .Gap(4)
                         .Add(Text.Small("Notes (Optional)"))
                         .Add(notes.ToTextInput().Placeholder("Add update notes..."))
                 ).Title("Additional Notes"))
