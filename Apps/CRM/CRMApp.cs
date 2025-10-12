@@ -445,37 +445,163 @@ public class RecentContactsBlade : ViewBase
         var context = this.UseService<ApplicationDbContext>();
         var blades = this.UseContext<IBladeController>();
         var refreshToken = this.UseRefreshToken();
-
-        var contacts = context.Contacts
+        var searchTerm = this.UseState("");
+        
+        var allContacts = context.Contacts
             .Include(c => c.Opportunities)
             .OrderByDescending(c => c.CreatedAt)
-            .Take(10)
             .ToList();
-
+        
+        // Filter contacts based on search term
+        var filteredContacts = string.IsNullOrEmpty(searchTerm.Value)
+            ? allContacts.Take(10).ToList()
+            : allContacts.Where(c => 
+                c.FirstName.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
+                c.LastName.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
+                c.Company.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase) ||
+                c.Email.Contains(searchTerm.Value, StringComparison.OrdinalIgnoreCase)
+            ).Take(10).ToList();
+        
         return Layout.Vertical()
             .Gap(4)
             .Padding(2)
-            .Add(Layout.Horizontal()
-                .Gap(4)
-                .Add(Text.H2("Recent Contacts"))
-                .Add(new Button("+ Add Contact", _ => { })
-                    .Icon(Icons.Plus)
-                    .Variant(ButtonVariant.Primary)))
+            .Add(Text.H2("Recent Contacts"))
+            .Add(searchTerm.ToTextInput("Search contacts...")
+                .Placeholder("Search by name, company, or email"))
             .Add(new Card(
-                contacts.Count > 0
-                    ? new List(contacts.Select(c => new ListItem(
+                filteredContacts.Count > 0
+                    ? new List(filteredContacts.Select(c => new ListItem(
                         title: $"{c.FirstName} {c.LastName}",
                         subtitle: $"{c.Company} - {c.Opportunities.Count} opportunities",
                         icon: Icons.User,
                         badge: c.Email,
                         onClick: _ => blades.Push(this, new ContactDetailBlade(c.Id, () => refreshToken.Refresh()), $"{c.FirstName} {c.LastName}")
                     )))
-                    : Layout.Vertical()
-                        .Gap(2)
-                        .Padding(4)
-                        .Add(Text.H4("No contacts found"))
-                        .Add(Text.P("Add your first contact to get started"))
-            ).Title("Recent Contacts"));
+                    : searchTerm.Value.Length > 0
+                        ? Layout.Vertical()
+                            .Gap(2)
+                            .Padding(4)
+                            .Add(Text.H4("No contacts found"))
+                            .Add(Text.P($"No contacts match '{searchTerm.Value}'"))
+                        : Layout.Vertical()
+                            .Gap(2)
+                            .Padding(4)
+                            .Add(Text.H4("No contacts found"))
+                            .Add(Text.P("Add your first contact to get started"))
+            ).Title($"Recent Contacts ({filteredContacts.Count})"))
+            .Add(new Button("+ Add New Contact", _ => {
+                blades.Push(this, new AddContactBlade(() => {
+                    refreshToken.Refresh();
+                    return System.Threading.Tasks.ValueTask.CompletedTask;
+                }), "Add Contact");
+                return default;
+            })
+                .Icon(Icons.Plus)
+                .Variant(ButtonVariant.Primary)
+                .Width(Size.Full()));
+    }
+}
+
+public class AddContactBlade : ViewBase
+{
+    private readonly System.Func<System.Threading.Tasks.ValueTask> _onRefresh;
+
+    public AddContactBlade(System.Func<System.Threading.Tasks.ValueTask> onRefresh)
+    {
+        _onRefresh = onRefresh;
+    }
+
+    public override object? Build()
+    {
+        var client = this.UseService<IClientProvider>();
+        var context = this.UseService<ApplicationDbContext>();
+        var blades = this.UseContext<IBladeController>();
+        
+        var firstName = this.UseState("");
+        var lastName = this.UseState("");
+        var email = this.UseState("");
+        var phone = this.UseState("");
+        var company = this.UseState("");
+        var jobTitle = this.UseState("");
+        var address = this.UseState("");
+        var city = this.UseState("");
+        var state = this.UseState("");
+        var zipCode = this.UseState("");
+        var country = this.UseState("");
+        var notes = this.UseState("");
+        
+        return Layout.Vertical()
+            .Gap(4)
+            .Padding(2)
+            .Add(Text.H2("Add New Contact"))
+            .Add(new Card(
+                Layout.Vertical()
+                    .Gap(3)
+                    .Padding(3)
+                    .Add(Layout.Horizontal()
+                        .Gap(3)
+                        .Add(firstName.ToTextInput("First Name").Width(Size.Full()))
+                        .Add(lastName.ToTextInput("Last Name").Width(Size.Full())))
+                    .Add(email.ToTextInput("Email").Width(Size.Full()))
+                    .Add(Layout.Horizontal()
+                        .Gap(3)
+                        .Add(phone.ToTextInput("Phone").Width(Size.Full()))
+                        .Add(company.ToTextInput("Company").Width(Size.Full())))
+                    .Add(jobTitle.ToTextInput("Job Title").Width(Size.Full()))
+                    .Add(address.ToTextInput("Address").Width(Size.Full()))
+                    .Add(Layout.Horizontal()
+                        .Gap(3)
+                        .Add(city.ToTextInput("City").Width(Size.Full()))
+                        .Add(state.ToTextInput("State").Width(Size.Full())))
+                    .Add(Layout.Horizontal()
+                        .Gap(3)
+                        .Add(zipCode.ToTextInput("Zip Code").Width(Size.Full()))
+                        .Add(country.ToTextInput("Country").Width(Size.Full())))
+                    .Add(notes.ToTextInput("Notes").Width(Size.Full()))
+            ).Title("Contact Information"))
+            .Add(Layout.Horizontal()
+                .Gap(3)
+                .Add(new Button("Cancel", _ => {
+                    blades.Pop(this);
+                    return default;
+                })
+                    .Variant(ButtonVariant.Outline)
+                    .Width(Size.Full()))
+                .Add(new Button("Save Contact", _ => {
+                    if (string.IsNullOrWhiteSpace(firstName.Value) || string.IsNullOrWhiteSpace(lastName.Value) || string.IsNullOrWhiteSpace(email.Value))
+                    {
+                        client.Toast("Please fill in required fields: First Name, Last Name, and Email");
+                        return default;
+                    }
+                    
+                    var contact = new Contact
+                    {
+                        FirstName = firstName.Value.Trim(),
+                        LastName = lastName.Value.Trim(),
+                        Email = email.Value.Trim(),
+                        Phone = phone.Value.Trim(),
+                        Company = company.Value.Trim(),
+                        JobTitle = jobTitle.Value.Trim(),
+                        Address = address.Value.Trim(),
+                        City = city.Value.Trim(),
+                        State = state.Value.Trim(),
+                        ZipCode = zipCode.Value.Trim(),
+                        Country = country.Value.Trim(),
+                        Notes = notes.Value.Trim(),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    
+                    context.Contacts.Add(contact);
+                    context.SaveChanges();
+                    
+                    client.Toast($"Contact {contact.FirstName} {contact.LastName} added successfully!");
+                    _onRefresh();
+                    blades.Pop(this);
+                    return default;
+                })
+                    .Variant(ButtonVariant.Primary)
+                    .Width(Size.Full())));
     }
 }
 
